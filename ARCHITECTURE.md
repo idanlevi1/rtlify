@@ -28,7 +28,7 @@ npx rtlify-ai init
   │   CLAUDE.md gets an extended pointer (~10 lines) with /rtlify instructions.
   │   All others get a 3-line pointer.
   │
-  └─ No separate SKILL.md or .rtlifyrc.json — everything in 2 files.
+  └─ If Claude Code detected: installs /rtlify skill globally (~/.claude/skills/rtlify/SKILL.md)
 
 npx rtlify-ai check
   │
@@ -110,4 +110,4 @@ Lines over 2000 characters are skipped (ReDoS prevention). Comment lines and `im
 
 **Interactive prompt only works in TTY.** `process.stdin.isTTY` gates the i18n/hardcoded question. In CI or piped input, it silently defaults to `enforceI18n: false`.
 
-**`/rtlify` lives inside `CLAUDE.md`.** The slash command instructions are embedded in the `CLAUDE.md` pointer (not a separate `SKILL.md`). Claude Code reads `CLAUDE.md` and sees both the pointer to `.rtlify-rules.md` and the `/rtlify` command instructions.
+**`/rtlify` is a global skill.** The slash command lives at `~/.claude/skills/rtlify/SKILL.md` (user's home, not the project). It's installed automatically when Claude Code is detected during `init`. This keeps the project clean — only `CLAUDE.md` and `.rtlify-rules.md` appear in the project.

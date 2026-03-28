@@ -118,17 +118,33 @@ When creating or modifying UI components, layouts, or RTL text (Hebrew/Arabic/Pe
 `;
 }
 
-function buildClaudePointer(): string {
-  return `# RTLify Rules
-When creating or modifying UI components, layouts, or RTL text (Hebrew/Arabic/Persian), you MUST read and strictly adhere to the guidelines in \`.rtlify-rules.md\`.
+const SKILL_CONTENT = `---
+name: rtlify
+description: Scan and fix RTL violations in the current project.
+---
 
-## /rtlify Command
 When the user types \`/rtlify\`:
 1. Run \`npx rtlify-ai check\` to find RTL violations
 2. Fix every violation according to \`.rtlify-rules.md\` — CSS to logical, icons flipped, \`<bdi>\` tags added
 3. Re-run \`npx rtlify-ai check\` to confirm zero violations
 Never extract strings to \`t()\` unless the rules file explicitly says to. Never break the build.
 `;
+
+async function installGlobalSkill(): Promise<boolean> {
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+  if (!home) return false;
+
+  const skillDir = join(home, ".claude", "skills", "rtlify");
+  const skillPath = join(skillDir, "SKILL.md");
+
+  await mkdir(skillDir, { recursive: true });
+
+  let existing = "";
+  try { existing = await readFile(skillPath, "utf-8"); } catch {}
+  if (existing === SKILL_CONTENT) return false;
+
+  await writeFile(skillPath, SKILL_CONTENT, "utf-8");
+  return true;
 }
 
 // --- Violation patterns ---
@@ -242,8 +258,9 @@ async function init() {
     targets = TARGET_FILES;
   }
 
-  // Inject pointer into each editor config (CLAUDE.md gets the slash command version)
+  // Inject pointer into each editor config
   const updated: string[] = [];
+  let skillInstalled = false;
   for (const { file, dir, label } of targets) {
     const targetDir = dir ? resolve(cwd, dir) : cwd;
     const targetPath = join(targetDir, file);
@@ -257,13 +274,17 @@ async function init() {
     }
     if (existing.includes(MARKER)) continue;
 
-    const pointer = file === "CLAUDE.md" ? buildClaudePointer() : buildPointer();
     const separator = existing.length > 0 ? "\n\n" : "";
-    await writeFile(targetPath, existing + separator + pointer, "utf-8");
+    await writeFile(targetPath, existing + separator + buildPointer(), "utf-8");
     updated.push(label);
+
+    // Install global /rtlify skill for Claude Code users
+    if (file === "CLAUDE.md" && !skillInstalled) {
+      skillInstalled = await installGlobalSkill();
+    }
   }
 
-  if (updated.length === 0 && !rulesWritten) {
+  if (updated.length === 0 && !rulesWritten && !skillInstalled) {
     console.log("");
     console.log(`  ${GREEN}●${RESET} Already set up — nothing to update.`);
     console.log("");
@@ -283,6 +304,9 @@ async function init() {
     for (const label of updated) {
       console.log(`  ${GREEN}+${RESET} ${label}`);
     }
+  }
+  if (skillInstalled) {
+    console.log(`  ${GREEN}+${RESET} /rtlify ${DIM}(global slash command)${RESET}`);
   }
 
   console.log("");
