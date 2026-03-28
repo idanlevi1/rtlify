@@ -8,12 +8,9 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RULES_PATH = join(__dirname, "rules.md");
 const RULES_FILE = ".rtlify-rules.md";
+const CONFIG_COMMENT_RE = /^<!-- rtlify:enforceI18n=(true|false) -->\n/;
 const MARKER = "# RTLify Rules";
-const POINTER = `# RTLify Rules
-When creating or modifying UI components, layouts, or RTL text (Hebrew/Arabic/Persian), you MUST read and strictly adhere to the guidelines in \`.rtlify-rules.md\`.
-`;
 const I18N_PLACEHOLDER = "<!-- RTLIFY_I18N_RULE -->";
-const CONFIG_FILE = ".rtlifyrc.json";
 
 interface RtlifyConfig {
   enforceI18n: boolean;
@@ -31,7 +28,7 @@ const TARGET_FILES: Target[] = [
   { file: ".cursorrules", label: "Cursor", detect: [".cursorrules", ".cursor"] },
   { file: ".windsurfrules", label: "Windsurf", detect: [".windsurfrules"] },
   { file: ".clinerules", label: "Cline", detect: [".clinerules"] },
-  { file: "copilot-instructions.md", dir: ".github", label: "Copilot", detect: [".github"] },
+  { file: "copilot-instructions.md", dir: ".github", label: "Copilot", detect: [".github/copilot-instructions.md"] },
   { file: "GEMINI.md", label: "Gemini CLI", detect: ["GEMINI.md"] },
   { file: "AGENTS.md", label: "Codex CLI", detect: ["AGENTS.md"] },
 ];
@@ -51,39 +48,18 @@ const DIM = "\x1b[2m";
 const BOLD = "\x1b[1m";
 const RESET = "\x1b[0m";
 
-// --- Config ---
+// --- Config (stored as comment in .rtlify-rules.md) ---
 async function readConfig(): Promise<RtlifyConfig> {
-  let raw: string;
   try {
-    raw = await readFile(resolve(process.cwd(), CONFIG_FILE), "utf-8");
-  } catch (e: unknown) {
-    if (e instanceof Error && "code" in e && (e as NodeJS.ErrnoException).code === "ENOENT") {
-      return { enforceI18n: false };
-    }
-    throw e;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    console.error(`${RED}Warning: .rtlifyrc.json is malformed — using defaults.${RESET}`);
-    return { enforceI18n: false };
-  }
-
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return { enforceI18n: false };
-  }
-  const obj = parsed as Record<string, unknown>;
-  return { enforceI18n: obj.enforceI18n === true };
+    const content = await readFile(resolve(process.cwd(), RULES_FILE), "utf-8");
+    const match = content.match(CONFIG_COMMENT_RE);
+    if (match) return { enforceI18n: match[1] === "true" };
+  } catch {}
+  return { enforceI18n: false };
 }
 
-async function writeConfig(config: RtlifyConfig): Promise<void> {
-  await writeFile(resolve(process.cwd(), CONFIG_FILE), JSON.stringify(config, null, 2) + "\n", "utf-8");
-}
-
-async function configExists(): Promise<boolean> {
-  try { await readFile(resolve(process.cwd(), CONFIG_FILE), "utf-8"); return true; } catch { return false; }
+async function rulesExist(): Promise<boolean> {
+  try { await readFile(resolve(process.cwd(), RULES_FILE), "utf-8"); return true; } catch { return false; }
 }
 
 function ask(question: string): Promise<string> {
@@ -135,40 +111,23 @@ const RULE_6_HARDCODED = `### 6. Hardcoded Mode (No i18n)
 \`\`\``;
 
 // --- Dynamic skill ---
-function buildSkillContent(config: RtlifyConfig): string {
-  const i18nBlock = config.enforceI18n
-    ? `   - Extract hardcoded Hebrew/Arabic strings into \`t('component.key')\` and generate the corresponding translation JSON entries.
-   - Ensure all new text uses the project's translation function.`
-    : `   - Do NOT extract strings to \`t()\` or create translation keys — this project does not use i18n.
-   - Leave Hebrew/Arabic text hardcoded in the JSX as-is.
-   - Only wrap embedded LTR content (numbers, English words, dates) in \`<bdi>\` tags.`;
+// --- Pointer content per editor ---
+function buildPointer(): string {
+  return `# RTLify Rules
+When creating or modifying UI components, layouts, or RTL text (Hebrew/Arabic/Persian), you MUST read and strictly adhere to the guidelines in \`.rtlify-rules.md\`.
+`;
+}
 
-  const safetyNote = config.enforceI18n
-    ? `**i18n mode:** This project uses translation functions. When extracting strings, always create the matching JSON entries so the UI renders correctly.`
-    : `**Hardcoded mode:** This project does NOT use i18n. NEVER introduce \`t()\` functions, \`useTranslation()\` imports, or translation keys. This will break the build.`;
+function buildClaudePointer(): string {
+  return `# RTLify Rules
+When creating or modifying UI components, layouts, or RTL text (Hebrew/Arabic/Persian), you MUST read and strictly adhere to the guidelines in \`.rtlify-rules.md\`.
 
-  return `---
-name: rtlify
-description: Scan the current file or project for RTL layout violations and automatically refactor them. Safe by default — never breaks builds.
----
-
-# RTLify Skill
-
-When the user invokes \`/rtlify\`, you must:
-
-1. **Scan for violations:** Run \`npx rtlify-ai check\` in the project root to identify all RTL violations.
-
-2. **Analyze the output:** Parse the violation report. Group the issues by file and category.
-
-3. **Auto-refactor each violation:**
-   - Convert physical CSS properties to logical equivalents (\`margin-left\` -> \`margin-inline-start\`, \`left\` -> \`inset-inline-start\`).
-   - Convert physical Tailwind classes to logical ones (\`ml-4\` -> \`ms-4\`, \`text-left\` -> \`text-start\`, \`rounded-tl-*\` -> \`rounded-ss-*\`). Refer to the full mapping table in \`.rtlify-rules.md\`.
-   - Add \`rtl:-scale-x-100\` to any directional icons (arrows, chevrons) that lack it.
-${i18nBlock}
-
-4. **Report a summary:** After refactoring, list every file changed and what was fixed. Then re-run \`npx rtlify-ai check\` to confirm zero remaining violations.
-
-${safetyNote}
+## /rtlify Command
+When the user types \`/rtlify\`:
+1. Run \`npx rtlify-ai check\` to find RTL violations
+2. Fix every violation according to \`.rtlify-rules.md\` — CSS to logical, icons flipped, \`<bdi>\` tags added
+3. Re-run \`npx rtlify-ai check\` to confirm zero violations
+Never extract strings to \`t()\` unless the rules file explicitly says to. Never break the build.
 `;
 }
 
@@ -195,34 +154,11 @@ const PATTERNS: Pattern[] = [
   { regex: /[>}]\s{0,20}[^<{]{0,500}[\u0600-\u06FF]{2,}/, category: "Hardcoded Arabic", message: "Hardcoded Arabic text — extract to i18n translation function", i18nOnly: true },
 ];
 
-// --- Claude Code slash command ---
-const SKILL_DIR = ".claude/skills/rtlify";
-const SKILL_FILE = "SKILL.md";
-const SKILL_MARKER = "# RTLify Skill";
-
-async function initSkill(config: RtlifyConfig): Promise<boolean> {
-  const skillDir = resolve(process.cwd(), SKILL_DIR);
-  const skillPath = join(skillDir, SKILL_FILE);
-  await mkdir(skillDir, { recursive: true });
-
-  let existing = "";
-  try { existing = await readFile(skillPath, "utf-8"); } catch {}
-
-  const content = buildSkillContent(config);
-
-  if (existing.includes(SKILL_MARKER)) {
-    const hadI18n = existing.includes("translation functions");
-    if ((hadI18n && config.enforceI18n) || (!hadI18n && !config.enforceI18n)) return false;
-  }
-
-  await writeFile(skillPath, content, "utf-8");
-  return true;
-}
 
 // --- init ---
 async function init() {
   let config: RtlifyConfig;
-  const hasConfig = await configExists();
+  const hasConfig = await rulesExist();
 
   if (hasConfig) {
     config = await readConfig();
@@ -231,24 +167,23 @@ async function init() {
     console.log(`  ${DIM}Config found ${RESET}${DIM}.rtlifyrc.json${RESET} ${DIM}(${mode} mode)${RESET}`);
   } else if (process.stdin.isTTY) {
     console.log("");
-    console.log(`  ${BOLD}rtlify-ai${RESET} ${DIM}v0.1.0${RESET}`);
+    console.log(`  ${BOLD}rtlify-ai${RESET} ${DIM}v0.2.0${RESET}`);
     console.log("");
-    console.log(`  ${BOLD}Does this project use i18n?${RESET} ${DIM}(react-i18next, next-intl, vue-i18n)${RESET}`);
+    console.log(`  ${BOLD}How do you handle translations?${RESET}`);
     console.log("");
-    console.log(`    ${GREEN}y${RESET}  AI wraps text in t('key'), linter flags hardcoded strings`);
-    console.log(`    ${CYAN}n${RESET}  AI writes text inline, linter only checks CSS & layout`);
+    console.log(`    ${BOLD}1${RESET}  ${CYAN}Hardcoded${RESET}  — text written inline, no i18n library`);
+    console.log(`    ${BOLD}2${RESET}  ${GREEN}i18n${RESET}       — uses react-i18next, next-intl, vue-i18n, etc.`);
     console.log("");
-    const answer = await ask(`  ${BOLD}>${RESET} i18n? ${DIM}[y/N]${RESET} `);
-    config = { enforceI18n: answer === "y" || answer === "yes" };
-    await writeConfig(config);
+    const answer = await ask(`  ${BOLD}>${RESET} Mode ${DIM}[1/2, default: 1]${RESET} `);
+    config = { enforceI18n: answer === "2" };
   } else {
     config = { enforceI18n: false };
-    await writeConfig(config);
   }
 
   const rulesTemplate = await readFile(RULES_PATH, "utf-8");
   const rule6 = config.enforceI18n ? RULE_6_I18N : RULE_6_HARDCODED;
-  const rulesContent = rulesTemplate.replace(I18N_PLACEHOLDER, rule6);
+  const configComment = `<!-- rtlify:enforceI18n=${config.enforceI18n} -->\n`;
+  const rulesContent = configComment + rulesTemplate.replace(I18N_PLACEHOLDER, rule6);
 
   const cwd = process.cwd();
   async function fileExists(p: string): Promise<boolean> {
@@ -258,7 +193,7 @@ async function init() {
     try { const entries = await readdir(p); return entries !== undefined; } catch { return false; }
   }
 
-  // Always create/update the full rules file (single source of truth)
+  // Write the full rules file (single source of truth, includes config)
   const rulesPath = resolve(cwd, RULES_FILE);
   let rulesWritten = false;
   let existingRulesContent = "";
@@ -307,7 +242,7 @@ async function init() {
     targets = TARGET_FILES;
   }
 
-  // Inject short pointer into each editor config
+  // Inject pointer into each editor config (CLAUDE.md gets the slash command version)
   const updated: string[] = [];
   for (const { file, dir, label } of targets) {
     const targetDir = dir ? resolve(cwd, dir) : cwd;
@@ -322,14 +257,13 @@ async function init() {
     }
     if (existing.includes(MARKER)) continue;
 
+    const pointer = file === "CLAUDE.md" ? buildClaudePointer() : buildPointer();
     const separator = existing.length > 0 ? "\n\n" : "";
-    await writeFile(targetPath, existing + separator + POINTER, "utf-8");
+    await writeFile(targetPath, existing + separator + pointer, "utf-8");
     updated.push(label);
   }
 
-  const skillCreated = await initSkill(config);
-
-  if (updated.length === 0 && !skillCreated && !rulesWritten) {
+  if (updated.length === 0 && !rulesWritten) {
     console.log("");
     console.log(`  ${GREEN}●${RESET} Already set up — nothing to update.`);
     console.log("");
@@ -343,20 +277,16 @@ async function init() {
   console.log("");
 
   if (rulesWritten) {
-    console.log(`  ${GREEN}+${RESET} .rtlify-rules.md ${DIM}(full ruleset)${RESET}`);
+    console.log(`  ${GREEN}+${RESET} .rtlify-rules.md ${DIM}(rules + config)${RESET}`);
   }
   if (updated.length > 0) {
     for (const label of updated) {
-      console.log(`  ${GREEN}+${RESET} ${label} ${DIM}(pointer added)${RESET}`);
+      console.log(`  ${GREEN}+${RESET} ${label}`);
     }
-  }
-  if (skillCreated) {
-    console.log(`  ${GREEN}+${RESET} /rtlify slash command`);
   }
 
   console.log("");
-  console.log(`  ${DIM}Mode${RESET}    ${mode === "i18n" ? `${CYAN}i18n${RESET} — AI uses t('key')` : `${CYAN}hardcoded${RESET} — AI writes text inline`}`);
-  console.log(`  ${DIM}Config${RESET}  .rtlifyrc.json`);
+  console.log(`  ${DIM}Mode${RESET}  ${mode === "i18n" ? `${GREEN}i18n${RESET}` : `${CYAN}hardcoded${RESET}`}`);
   console.log("");
   console.log(`  ${DIM}Next: ${RESET}${BOLD}npx rtlify-ai check${RESET}${DIM} to scan for violations${RESET}`);
   console.log("");

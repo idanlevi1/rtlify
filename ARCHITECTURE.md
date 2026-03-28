@@ -10,30 +10,29 @@ RTLify injects a structured markdown document — containing 8 RTL architecture 
 npx rtlify-ai init
   │
   ├─ Reads src/rules.md (template with placeholder)
-  ├─ Reads .rtlifyrc.json (user's i18n preference)
   ├─ Replaces <!-- RTLIFY_I18N_RULE --> with the correct Rule 6 variant
   │
-  ├─ Writes full ruleset to .rtlify-rules.md (single source of truth)
-  │   (always created/updated — stays in sync with config)
+  ├─ Writes .rtlify-rules.md (full rules + config as HTML comment)
+  │   Config stored as: <!-- rtlify:enforceI18n=false -->
   │
   ├─ Auto-detects which editors are in use (if none found, shows interactive picker)
-  ├─ Appends a short pointer (3 lines) to detected editor config files:
-  │   ├── CLAUDE.md                        (Claude Code)
-  │   ├── .cursorrules                     (Cursor)
-  │   ├── .windsurfrules                   (Windsurf)
-  │   ├── .clinerules                      (Cline)
+  ├─ Appends a short pointer to detected editor config files:
+  │   ├── CLAUDE.md        (Claude Code — includes /rtlify slash command)
+  │   ├── .cursorrules     (Cursor)
+  │   ├── .windsurfrules   (Windsurf)
+  │   ├── .clinerules      (Cline)
   │   ├── .github/copilot-instructions.md  (Copilot)
-  │   ├── GEMINI.md                        (Gemini CLI)
-  │   └── AGENTS.md                        (Codex CLI)
+  │   ├── GEMINI.md        (Gemini CLI)
+  │   └── AGENTS.md        (Codex CLI)
   │
-  │   The pointer reads:
-  │     "When creating or modifying UI components... read .rtlify-rules.md"
+  │   CLAUDE.md gets an extended pointer (~10 lines) with /rtlify instructions.
+  │   All others get a 3-line pointer.
   │
-  └─ Generates .claude/skills/rtlify/SKILL.md (the /rtlify slash command)
+  └─ No separate SKILL.md or .rtlifyrc.json — everything in 2 files.
 
 npx rtlify-ai check
   │
-  ├─ Reads .rtlifyrc.json → determines which patterns to run
+  ├─ Reads config from .rtlify-rules.md header comment
   ├─ Recursively scans .js/.jsx/.ts/.tsx files (skips node_modules, dist, etc.)
   ├─ Runs 12 regex patterns against each line
   └─ Outputs violations, exits with code 1 if any found
@@ -69,11 +68,10 @@ The AI sees deterministic instructions, not conditional logic. The two rule vari
 
 ### 2. Config Drives Everything
 
-`.rtlifyrc.json` (`{ "enforceI18n": boolean }`) is the single source of truth. It controls:
+Config is stored as an HTML comment at the top of `.rtlify-rules.md` (`<!-- rtlify:enforceI18n=false -->`). No separate config file. It controls:
 
-- Which Rule 6 variant is injected into editor config files
+- Which Rule 6 variant is in the rules file
 - Which regex patterns `check` runs (hardcoded text patterns have `i18nOnly: true`)
-- What instructions the `/rtlify` slash command contains
 
 ### 3. Safe by Default
 
@@ -92,7 +90,7 @@ RTLify doesn't fix broken code after generation — it prevents incorrect code f
 | 3 | Icon Flipping | `rtl:-scale-x-100` on directional icons |
 | 4 | BDI Safety | `<bdi>` tags for LTR content inside RTL text |
 | 5 | Localized Formats | `Intl.NumberFormat` / `Intl.DateTimeFormat` with correct locales |
-| 6 | i18n Mode | Dynamic — depends on `.rtlifyrc.json` config |
+| 6 | i18n Mode | Dynamic — depends on config in `.rtlify-rules.md` header |
 | 7 | Complex Components | Carousels, charts, sliders with RTL-aware config |
 | 8 | React Native | `I18nManager.isRTL`, `paddingStart`, `writingDirection` |
 
@@ -112,4 +110,4 @@ Lines over 2000 characters are skipped (ReDoS prevention). Comment lines and `im
 
 **Interactive prompt only works in TTY.** `process.stdin.isTTY` gates the i18n/hardcoded question. In CI or piped input, it silently defaults to `enforceI18n: false`.
 
-**"Slash command" not "skill" in user-facing text.** The file mechanism is a Claude Code skill (`SKILL.md`), but the project standardized on calling it a "slash command" in the README and CLI output.
+**`/rtlify` lives inside `CLAUDE.md`.** The slash command instructions are embedded in the `CLAUDE.md` pointer (not a separate `SKILL.md`). Claude Code reads `CLAUDE.md` and sees both the pointer to `.rtlify-rules.md` and the `/rtlify` command instructions.

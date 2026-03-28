@@ -219,7 +219,7 @@ node dist/cli.js help          # Verify help output
 
 # 4. Key files to know
 # ARCHITECTURE.md              How everything connects (start here!)
-# .rtlifyrc.json               Generated config (i18n vs hardcoded mode)
+# .rtlify-rules.md             Generated rules + config (single file)
 # .rtlify-rules.md             Generated full ruleset (single source of truth)
 
 # 5. Submit a PR
