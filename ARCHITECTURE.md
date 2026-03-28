@@ -7,7 +7,7 @@ RTLify is a zero-config CLI tool that teaches AI coding agents to generate corre
 RTLify injects a structured markdown document — containing 8 RTL architecture rules with concrete code examples — into editor config files that AI agents read before generating code. There is no runtime, no server, no plugin API. The AI reads the rules and follows them.
 
 ```
-npx rtlify init
+npx rtlify-ai init
   │
   ├─ Reads src/rules.md (template with placeholder)
   ├─ Reads .rtlifyrc.json (user's i18n preference)
@@ -31,7 +31,7 @@ npx rtlify init
   │
   └─ Generates .claude/skills/rtlify/SKILL.md (the /rtlify slash command)
 
-npx rtlify check
+npx rtlify-ai check
   │
   ├─ Reads .rtlifyrc.json → determines which patterns to run
   ├─ Recursively scans .js/.jsx/.ts/.tsx files (skips node_modules, dist, etc.)

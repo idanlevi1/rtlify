@@ -156,7 +156,7 @@ description: Scan the current file or project for RTL layout violations and auto
 
 When the user invokes \`/rtlify\`, you must:
 
-1. **Scan for violations:** Run \`npx rtlify check\` in the project root to identify all RTL violations.
+1. **Scan for violations:** Run \`npx rtlify-ai check\` in the project root to identify all RTL violations.
 
 2. **Analyze the output:** Parse the violation report. Group the issues by file and category.
 
@@ -166,7 +166,7 @@ When the user invokes \`/rtlify\`, you must:
    - Add \`rtl:-scale-x-100\` to any directional icons (arrows, chevrons) that lack it.
 ${i18nBlock}
 
-4. **Report a summary:** After refactoring, list every file changed and what was fixed. Then re-run \`npx rtlify check\` to confirm zero remaining violations.
+4. **Report a summary:** After refactoring, list every file changed and what was fixed. Then re-run \`npx rtlify-ai check\` to confirm zero remaining violations.
 
 ${safetyNote}
 `;
@@ -231,7 +231,7 @@ async function init() {
     console.log(`  ${DIM}Config found ${RESET}${DIM}.rtlifyrc.json${RESET} ${DIM}(${mode} mode)${RESET}`);
   } else if (process.stdin.isTTY) {
     console.log("");
-    console.log(`  ${BOLD}rtlify${RESET} ${DIM}v0.1.0${RESET}`);
+    console.log(`  ${BOLD}rtlify-ai${RESET} ${DIM}v0.1.0${RESET}`);
     console.log("");
     console.log(`  ${BOLD}Does this project use i18n?${RESET} ${DIM}(react-i18next, next-intl, vue-i18n)${RESET}`);
     console.log("");
@@ -336,7 +336,7 @@ async function init() {
   console.log(`  ${DIM}Mode${RESET}    ${mode === "i18n" ? `${CYAN}i18n${RESET} — AI uses t('key')` : `${CYAN}hardcoded${RESET} — AI writes text inline`}`);
   console.log(`  ${DIM}Config${RESET}  .rtlifyrc.json`);
   console.log("");
-  console.log(`  ${DIM}Next: ${RESET}${BOLD}npx rtlify check${RESET}${DIM} to scan for violations${RESET}`);
+  console.log(`  ${DIM}Next: ${RESET}${BOLD}npx rtlify-ai check${RESET}${DIM} to scan for violations${RESET}`);
   console.log("");
 }
 
@@ -393,7 +393,7 @@ async function check() {
   const mode = config.enforceI18n ? "i18n" : "hardcoded";
 
   console.log("");
-  console.log(`  ${BOLD}rtlify check${RESET} ${DIM}(${mode} mode)${RESET}`);
+  console.log(`  ${BOLD}rtlify-ai check${RESET} ${DIM}(${mode} mode)${RESET}`);
   console.log("");
 
   const files = await collectFiles(cwd);
@@ -435,7 +435,7 @@ async function check() {
 // --- help ---
 function printUsage() {
   console.log("");
-  console.log(`  ${BOLD}rtlify${RESET} ${DIM}v0.1.0${RESET}`);
+  console.log(`  ${BOLD}rtlify-ai${RESET} ${DIM}v0.1.0${RESET}`);
   console.log(`  ${DIM}RTL-aware AI rules for frontend developers${RESET}`);
   console.log("");
   console.log(`  ${BOLD}Commands${RESET}`);

@@ -21,7 +21,7 @@
 
   <!-- Line 1: command -->
   <text x="24" y="72" font-family="SF Mono, Consolas, monospace" font-size="13">
-    <tspan fill="#a6e3a1">$</tspan><tspan fill="#cdd6f4"> npx rtlify init</tspan>
+    <tspan fill="#a6e3a1">$</tspan><tspan fill="#cdd6f4"> npx rtlify-ai init</tspan>
   </text>
 
   <!-- Line 3: prompt -->
@@ -72,7 +72,7 @@
 
   <!-- Check command -->
   <text x="24" y="428" font-family="SF Mono, Consolas, monospace" font-size="13">
-    <tspan fill="#a6e3a1">$</tspan><tspan fill="#cdd6f4"> npx rtlify check</tspan>
+    <tspan fill="#a6e3a1">$</tspan><tspan fill="#cdd6f4"> npx rtlify-ai check</tspan>
   </text>
 
   <text x="24" y="456" font-family="SF Mono, Consolas, monospace" font-size="13">

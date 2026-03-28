@@ -1,10 +1,10 @@
 {
-  "name": "rtlify",
+  "name": "rtlify-ai",
   "version": "0.1.0",
   "description": "Zero-config RTL & Localization rules for Claude Code",
   "type": "module",
   "bin": {
-    "rtlify": "dist/cli.js"
+    "rtlify-ai": "dist/cli.js"
   },
   "files": [
     "dist"

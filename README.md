@@ -10,7 +10,7 @@ Teach your AI editor once — it generates production-ready<br/>RTL code from th
 
 <br/>
 
-[![npm version](https://img.shields.io/npm/v/rtlify?style=flat-square&color=cb3837)](https://www.npmjs.com/package/rtlify)
+[![npm version](https://img.shields.io/npm/v/rtlify-ai?style=flat-square&color=cb3837)](https://www.npmjs.com/package/rtlify-ai)
 [![license](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen?style=flat-square)](package.json)
 [![editors](https://img.shields.io/badge/editors-7%20supported-blue?style=flat-square)](#supported-ai-platforms)
@@ -64,7 +64,7 @@ Every AI coding agent is trained on LTR codebases. Ask it to build an RTL interf
 ## Quick Start
 
 ```bash
-npx rtlify init
+npx rtlify-ai init
 ```
 
 Run once per project. After that, just code normally — your AI editor reads the rules automatically in the background.
@@ -104,7 +104,7 @@ There is no black box. RTLify saves the full ruleset to `.rtlify-rules.md` and a
 ### Step 1 — 🧠 The Injection
 
 ```bash
-npx rtlify init
+npx rtlify-ai init
 ```
 
 Installs the **RTL Brain**: 8 architecture rules with **"do this / not that"** code examples and a full Tailwind class mapping table. The AI reads them automatically — no extra prompting.
@@ -112,7 +112,7 @@ Installs the **RTL Brain**: 8 architecture rules with **"do this / not that"** c
 ### Step 2 — 🔍 The Audit
 
 ```bash
-npx rtlify check
+npx rtlify-ai check
 ```
 
 ```
@@ -130,7 +130,7 @@ Exits with code 1 — plug it into CI.
 
 Type **`/rtlify`** in Claude Code. It will:
 
-1. Run `npx rtlify check` to find violations
+1. Run `npx rtlify-ai check` to find violations
 2. Apply targeted fixes — CSS to logical, icons flipped, `<bdi>` tags added
 3. Re-run the check to confirm zero violations
 
@@ -157,7 +157,7 @@ What the RTL Brain teaches your AI agent:
 
 ## Try It
 
-After `npx rtlify init`, try these prompts:
+After `npx rtlify-ai init`, try these prompts:
 
 > 💬 **"Build a checkout form in Hebrew"**
 >
@@ -178,7 +178,7 @@ After `npx rtlify init`, try these prompts:
 ```bash
 git clone https://github.com/idanlevi1/rtlify.git
 cd rtlify/examples/playground
-npx rtlify check
+npx rtlify-ai check
 ```
 
 `BrokenDashboard.tsx` has 11 intentional RTL violations. The linter catches all of them.

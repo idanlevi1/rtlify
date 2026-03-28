@@ -6,7 +6,7 @@
 
 ```bash
 cd examples/playground
-npx rtlify check
+npx rtlify-ai check
 ```
 
 Watch the linter catch every violation. Then try fixing them with the `/rtlify` slash command in Claude Code.
