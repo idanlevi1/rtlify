@@ -16,7 +16,7 @@ npx rtlify-ai init
   ├─ Writes full ruleset to .rtlify-rules.md (single source of truth)
   │   (always created/updated — stays in sync with config)
   │
-  ├─ Auto-detects which editors are in use (falls back to all 7 if none found)
+  ├─ Auto-detects which editors are in use (if none found, shows interactive picker)
   ├─ Appends a short pointer (3 lines) to detected editor config files:
   │   ├── CLAUDE.md                        (Claude Code)
   │   ├── .cursorrules                     (Cursor)

@@ -280,8 +280,32 @@ async function init() {
     }
   }
 
-  // If no editors detected, write to all (first-time setup)
-  const targets = detected.length > 0 ? detected : TARGET_FILES;
+  // If no editors detected, ask the user to pick (or default to all in non-TTY)
+  let targets: Target[];
+  if (detected.length > 0) {
+    targets = detected;
+  } else if (process.stdin.isTTY) {
+    console.log("");
+    console.log(`  ${BOLD}Which AI editors do you use?${RESET} ${DIM}(comma-separated numbers, or Enter for all)${RESET}`);
+    console.log("");
+    for (let i = 0; i < TARGET_FILES.length; i++) {
+      console.log(`    ${BOLD}${i + 1}${RESET}  ${TARGET_FILES[i].label}`);
+    }
+    console.log("");
+    const picks = await ask(`  ${BOLD}>${RESET} Editors ${DIM}[1-${TARGET_FILES.length}, default: all]${RESET} `);
+
+    if (picks === "") {
+      targets = TARGET_FILES;
+    } else {
+      const indices = picks.split(",").map((s) => parseInt(s.trim(), 10) - 1);
+      targets = indices
+        .filter((i) => i >= 0 && i < TARGET_FILES.length)
+        .map((i) => TARGET_FILES[i]);
+      if (targets.length === 0) targets = TARGET_FILES;
+    }
+  } else {
+    targets = TARGET_FILES;
+  }
 
   // Inject short pointer into each editor config
   const updated: string[] = [];
@@ -325,8 +349,6 @@ async function init() {
     for (const label of updated) {
       console.log(`  ${GREEN}+${RESET} ${label} ${DIM}(pointer added)${RESET}`);
     }
-  } else if (rulesWritten) {
-    console.log(`  ${GREEN}+${RESET} All 7 platforms ${DIM}(no editors detected, pointers added)${RESET}`);
   }
   if (skillCreated) {
     console.log(`  ${GREEN}+${RESET} /rtlify slash command`);
@@ -432,6 +454,42 @@ async function check() {
   }
 }
 
+// --- fix ---
+const FIX_PROMPT = `Scan all files in this project for RTL violations by running \`npx rtlify-ai check\`.
+Fix every violation according to the rules in \`.rtlify-rules.md\`.
+After fixing, re-run \`npx rtlify-ai check\` to confirm zero remaining violations.`;
+
+async function fix() {
+  console.log("");
+  console.log(`  ${BOLD}rtlify-ai fix${RESET}`);
+  console.log("");
+  console.log(`  ${DIM}Paste this prompt into your AI editor (Cursor, Windsurf, Cline, Copilot, etc.):${RESET}`);
+  console.log("");
+  console.log(`  ${DIM}${"─".repeat(60)}${RESET}`);
+  console.log("");
+  console.log(`  ${CYAN}${FIX_PROMPT.split("\n").join(`\n  `)}${RESET}`);
+  console.log("");
+  console.log(`  ${DIM}${"─".repeat(60)}${RESET}`);
+  console.log("");
+  console.log(`  ${DIM}Claude Code users: just type ${RESET}${BOLD}/rtlify${RESET}${DIM} instead.${RESET}`);
+  console.log("");
+
+  // Try to copy to clipboard
+  try {
+    const { execSync } = await import("node:child_process");
+    if (process.platform === "darwin") {
+      execSync("pbcopy", { input: FIX_PROMPT });
+      console.log(`  ${GREEN}Copied to clipboard!${RESET}`);
+    } else if (process.platform === "linux") {
+      execSync("xclip -selection clipboard", { input: FIX_PROMPT });
+      console.log(`  ${GREEN}Copied to clipboard!${RESET}`);
+    }
+  } catch {
+    // Clipboard not available — that's fine
+  }
+  console.log("");
+}
+
 // --- help ---
 function printUsage() {
   console.log("");
@@ -444,6 +502,8 @@ function printUsage() {
   console.log(`             ${DIM}Auto-detects your editors, asks i18n preference${RESET}`);
   console.log(`    ${BOLD}check${RESET}    Scan for RTL violations`);
   console.log(`             ${DIM}Flags physical CSS, Tailwind classes, and bidi issues${RESET}`);
+  console.log(`    ${BOLD}fix${RESET}      Generate a fix prompt for any AI editor`);
+  console.log(`             ${DIM}Copies to clipboard — paste into Cursor, Windsurf, Cline, etc.${RESET}`);
   console.log(`    ${BOLD}help${RESET}     Show this message`);
   console.log("");
   console.log(`  ${DIM}Docs${RESET}  ${CYAN}https://github.com/idanlevi1/rtlify${RESET}`);
@@ -455,6 +515,7 @@ const command = process.argv[2];
 switch (command) {
   case "init": init().catch((e) => { console.error("Error:", e.message); process.exit(1); }); break;
   case "check": check().catch((e) => { console.error("Error:", e.message); process.exit(1); }); break;
+  case "fix": fix().catch((e) => { console.error("Error:", e.message); process.exit(1); }); break;
   case "help": case "--help": case "-h": printUsage(); break;
   default: printUsage(); process.exit(command ? 1 : 0);
 }

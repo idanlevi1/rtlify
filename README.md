@@ -136,6 +136,14 @@ Type **`/rtlify`** in Claude Code. It will:
 
 > **Safe by default:** scoped to RTL layout fixes only. Never extracts strings to `t()`. Never invents translation keys. Never introduces undefined imports. Every fix is reviewable in a standard diff.
 
+### Not using Claude Code? — 🔧 `fix`
+
+```bash
+npx rtlify-ai fix
+```
+
+Generates a ready-to-paste prompt and copies it to your clipboard. Paste it into **Cursor**, **Windsurf**, **Cline**, **Copilot**, or any AI editor — it tells the AI to scan, fix, and verify using the rules in `.rtlify-rules.md`.
+
 <br/>
 
 ## Core Features
