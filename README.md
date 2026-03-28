@@ -1,155 +1,163 @@
 <div align="center">
 
+<br/>
+
 # RTLify
 
-**RTL-aware AI rules for frontend developers.**<br/>
-**Hebrew · Arabic · Persian (Farsi) · Urdu**
+### The RTL Brain for AI Coding Agents
 
-[![npm version](https://img.shields.io/npm/v/rtlify)](https://www.npmjs.com/package/rtlify)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+Teach your AI editor once — it generates production-ready<br/>RTL code from that point on. No plugins. No runtime. One command.
 
-```bash
-npx rtlify init
-```
+<br/>
+
+[![npm version](https://img.shields.io/npm/v/rtlify?style=flat-square&color=cb3837)](https://www.npmjs.com/package/rtlify)
+[![license](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen?style=flat-square)](package.json)
+[![editors](https://img.shields.io/badge/editors-7%20supported-blue?style=flat-square)](#supported-ai-platforms)
+[![RTL rules](https://img.shields.io/badge/RTL%20rules-8-orange?style=flat-square)](#core-features)
+[![zero dependencies](https://img.shields.io/badge/dependencies-0-lightgrey?style=flat-square)](package.json)
+
+<br/>
+
+**Hebrew** · **Arabic** · **Persian (Farsi)** · **Urdu**
+
+<br/>
 
 <img src="assets/pillars.svg" alt="RTLify — The Three Pillars" width="820" />
 
+<br/>
+
 </div>
 
----
+<br/>
 
 ## The Core Idea
 
-AI coding agents are trained on LTR codebases. They don't know RTL. Every component they generate has broken margins, flipped icons, corrupted bidi text, and hardcoded strings.
+**RTLify doesn't fix code after generation — it prevents incorrect code from being generated in the first place.** Teach your AI once instead of fixing every component manually.
 
-**RTLify doesn't fix code after generation — it prevents incorrect code from being generated in the first place.**
+> **RTLify is not an i18n library.** It's an AI behavior layer — zero runtime dependencies — that ensures your coding agent uses correct RTL patterns and respects your existing localization setup.
 
-One command injects RTL architecture rules directly into your AI editor's context. From that point on, the AI consistently generates production-ready RTL-aware code. Teach it once instead of fixing every component manually.
+<br/>
 
-> **RTLify is not an i18n library.** It has zero runtime dependencies — it's an AI behavior layer that ensures your coding agent uses correct RTL patterns and respects your existing localization setup.
+## Why
 
-**Who it's for:** Frontend and mobile developers building products for RTL markets — whether you're a solo developer or a team shipping to millions of Hebrew, Arabic, or Persian-speaking users.
-
----
-
-## The Problem
+Every AI coding agent is trained on LTR codebases. Ask it to build an RTL interface and it will:
 
 **CSS & Layout**
-- ❌ `margin-left` instead of `margin-inline-start` — layout mirrors incorrectly
-- ❌ `ml-4` in Tailwind instead of `ms-4` — spacing breaks in RTL
-- ❌ `paddingLeft` in React Native instead of `paddingStart`
+- `margin-left` instead of `margin-inline-start`
+- `ml-4` in Tailwind instead of `ms-4`
+- `paddingLeft` in React Native instead of `paddingStart`
 
 **Text & Bidi**
-- ❌ Hardcoded `"ברוכים הבאים"` or `"مرحباً"` in JSX without translation functions
-- ❌ Mixed Hebrew + numbers without `<bdi>` tags — content jumps to wrong positions
-- ❌ Dates and currency formatted for US locale
+- Hardcoded `"ברוכים הבאים"` or `"مرحباً"` without translation functions
+- Mixed Hebrew + numbers without `<bdi>` tags — content jumps around
+- US locale for dates and currency
 
 **Components**
-- ❌ Arrows and chevrons pointing the wrong direction
-- ❌ Carousels, charts, and sliders rendering backwards
+- Arrows and chevrons pointing the wrong way
+- Carousels, charts, and sliders rendering backwards
 
-...and dozens of subtle RTL bugs that slip into production.
+...and dozens of subtle bugs that slip into production.
 
----
+<br/>
 
-## Installation & Setup
-
-| Requirement | Version |
-|---|---|
-| **Node.js** | 18+ |
+## Quick Start
 
 ```bash
 npx rtlify init
 ```
 
-> **Interactive Setup:** During initialization, RTLify will ask if you want to enforce strict i18n or allow hardcoded RTL strings. It adapts safely to both workflows.
+Run once per project. After that, just code normally — your AI editor reads the rules automatically in the background.
 
-RTLify injects rules into all supported platforms and installs a `/rtlify` slash command for Claude Code. Zero config.
+<br/>
 
-### Supported AI Platforms
+## Supported AI Platforms
 
-**Claude Code** · **Cursor** · **Windsurf** · **Cline** · **GitHub Copilot** · **Gemini CLI** · **Codex CLI**
+<table>
+<tr>
+<td align="center"><strong>Claude Code</strong><br/><sub>CLAUDE.md + /rtlify</sub></td>
+<td align="center"><strong>Cursor</strong><br/><sub>.cursorrules</sub></td>
+<td align="center"><strong>Windsurf</strong><br/><sub>.windsurfrules</sub></td>
+<td align="center"><strong>Cline</strong><br/><sub>.clinerules</sub></td>
+<td align="center"><strong>Copilot</strong><br/><sub>copilot-instructions.md</sub></td>
+<td align="center"><strong>Gemini CLI</strong><br/><sub>GEMINI.md</sub></td>
+<td align="center"><strong>Codex CLI</strong><br/><sub>AGENTS.md</sub></td>
+</tr>
+</table>
 
 ### Supported Frameworks
 
-| Stack | Status |
-|---|---|
-| **React & Next.js** (App Router & Pages Router) | ✅ Full |
-| **Vite + React** | ✅ Full |
-| **React Native** (Web & Mobile) | ✅ Full |
-| **Vanilla JS / TypeScript** | ✅ Full |
-| **Tailwind CSS** (v3 & v4) | ✅ Full |
+**React & Next.js** · **Vite** · **React Native** · **Vanilla JS/TS** · **Tailwind CSS v3 & v4**
 
----
+<br/>
 
-## How RTLify Works
+## How It Works
 
-There is no black box. RTLify saves the full ruleset to `.rtlify-rules.md` and adds a short 3-line pointer to your editor config files (`CLAUDE.md`, `.cursorrules`, etc.) that tells the AI to read it. Your config files stay clean. You can open `.rtlify-rules.md` and read exactly what the AI sees. Full transparency, no abstractions.
+<div align="center">
+<img src="assets/demo.svg" alt="RTLify CLI demo" width="820" />
+</div>
+
+<br/>
+
+There is no black box. RTLify saves the full ruleset to `.rtlify-rules.md` and adds a short 3-line pointer to your editor config files. Your config stays clean — the AI knows where to find the rules. Open `.rtlify-rules.md` and read exactly what the AI sees.
 
 ### Step 1 — 🧠 The Injection
 
-> `npx rtlify init` installs the **RTL Brain** into your project.
+```bash
+npx rtlify init
+```
 
-The rules include **"do this / not that"** code blocks and a full Tailwind class mapping table. The AI reads them automatically on every conversation — no extra prompting needed.
+Installs the **RTL Brain**: 8 architecture rules with **"do this / not that"** code examples and a full Tailwind class mapping table. The AI reads them automatically — no extra prompting.
 
 ### Step 2 — 🔍 The Audit
 
-> `npx rtlify check` scans your codebase for RTL violations.
-
-```
-src/components/Sidebar.tsx
-  L14  Tailwind Physical  Use logical classes (ms-*, me-*, ps-*, pe-*)
-       <div className="ml-4 pl-6 text-left">
-
-src/pages/Home.tsx
-  L22  Hardcoded Hebrew   Check for mixed LTR content (numbers, English) that needs <bdi> wrapping
-       <p>הזמנה מספר #12345 התקבלה</p>
-
-Found 2 violation(s) across 2 file(s).
+```bash
+npx rtlify check
 ```
 
-Exits with **code 1** — plug it into CI.
+```
+  src/components/Sidebar.tsx
+       3 Tailwind Physical
+         Use logical classes (ms-*, me-*, ps-*, pe-*)
+         <div className="ml-4 pl-6 text-left">
 
-### Step 3 — 🪄 The `/rtlify` Slash Command
+  1 violation across 1 file
+```
 
-> Type **`/rtlify`** in Claude Code to apply safe, reviewable RTL fixes.
+Exits with code 1 — plug it into CI.
 
-The slash command instructs Claude to:
+### Step 3 — 🪄 The `/rtlify` Command
+
+Type **`/rtlify`** in Claude Code. It will:
 
 1. Run `npx rtlify check` to find violations
-2. Apply targeted fixes — physical CSS to logical, icons flipped, inline `<bdi>` tags added
-3. Re-run the check to confirm zero remaining violations
+2. Apply targeted fixes — CSS to logical, icons flipped, `<bdi>` tags added
+3. Re-run the check to confirm zero violations
 
-**Safety guarantees:**
-- Every change is scoped to RTL layout fixes — no architecture rewrites, no unrelated logic changes
-- Never extracts strings into `t()` or invents translation keys
-- Never introduces undefined imports or functions
-- Every fix is visible in a standard diff — review before you commit
+> **Safe by default:** scoped to RTL layout fixes only. Never extracts strings to `t()`. Never invents translation keys. Never introduces undefined imports. Every fix is reviewable in a standard diff.
 
-The `/rtlify` command is safe to run on any codebase. It will not break your build.
-
----
+<br/>
 
 ## Core Features
 
 What the RTL Brain teaches your AI agent:
 
-| Feature | What the AI Learns to Do | Example / Impact |
-|---|---|---|
-| **Logical CSS** | Replace physical directional properties with logical equivalents | `margin-left` → `margin-inline-start`, `left` → `inset-inline-start` |
-| **Tailwind Mapping** | Use logical utility classes from a 20+ class conversion table | `ml-4` → `ms-4`, `text-left` → `text-start`, `rounded-tl-*` → `rounded-ss-*` |
-| **Icon Flipping** | Flip directional icons in RTL mode, skip non-directional icons | `<ChevronRight className="rtl:-scale-x-100" />` |
-| **BDI Safety** | Wrap LTR content inside RTL sentences with inline `<bdi>` tags | `<bdi>#12345</bdi>` keeps order numbers anchored correctly |
-| **Localized Formats** | Use `Intl` APIs with correct locale codes for dates and currency | `Intl.NumberFormat('he-IL', { currency: 'ILS' })` → `42.90 ₪` |
-| **Safe i18n** | Use `t()` only when the project has i18n set up; never auto-extract | Existing `t()` calls respected; no build-breaking refactors |
-| **Complex Components** | Configure carousels, charts, and sliders for RTL rendering | `<Swiper dir="rtl">`, `<XAxis reversed={isRTL} />` |
-| **React Native** | Use mobile-specific RTL APIs and Flexbox start/end | `paddingStart`, `I18nManager.isRTL`, `writingDirection: 'rtl'` |
+| | Feature | What the AI Learns | Example |
+|---|---|---|---|
+| 1 | **Logical CSS** | Replace physical properties with logical | `margin-left` → `margin-inline-start` |
+| 2 | **Tailwind Mapping** | 20+ class conversions | `ml-4` → `ms-4`, `text-left` → `text-start` |
+| 3 | **Icon Flipping** | Flip directional icons only | `rtl:-scale-x-100` on arrows/chevrons |
+| 4 | **BDI Safety** | Wrap LTR in RTL with `<bdi>` | `<bdi>#12345</bdi>` stays anchored |
+| 5 | **Localized Formats** | `Intl` APIs with correct locales | `Intl.NumberFormat('he-IL')` → `42.90 ₪` |
+| 6 | **Safe i18n** | `t()` only if project has i18n | Never auto-extracts, never breaks builds |
+| 7 | **Complex Components** | RTL-aware carousels, charts, sliders | `<Swiper dir="rtl">` |
+| 8 | **React Native** | Mobile RTL APIs | `paddingStart`, `I18nManager.isRTL` |
 
----
+<br/>
 
 ## Try It
 
-After running `npx rtlify init`, try these prompts in your editor:
+After `npx rtlify init`, try these prompts:
 
 > 💬 **"Build a checkout form in Hebrew"**
 >
@@ -157,76 +165,78 @@ After running `npx rtlify init`, try these prompts in your editor:
 
 > 💬 **"Create a React Native settings screen in Arabic"**
 >
-> AI uses `paddingStart` instead of `paddingLeft`, checks `I18nManager.isRTL` for icon transforms, sets `writingDirection: 'rtl'` on text.
+> AI uses `paddingStart` instead of `paddingLeft`, checks `I18nManager.isRTL` for icon transforms, sets `writingDirection: 'rtl'`.
 
-> 💬 **"Show a confirmation: 'ההזמנה שלך #12345 אושרה'"**
+> 💬 **"Show: 'ההזמנה שלך #12345 אושרה'"**
 >
-> Order number renders as `<bdi>#12345</bdi>` — stays anchored in the correct visual position.
+> Order number renders as `<bdi>#12345</bdi>` — stays anchored correctly.
 
----
+<br/>
 
-## 🎮 Local Playground
-
-Clone the repo and run:
+## 🎮 Playground
 
 ```bash
-cd examples/playground
+git clone https://github.com/idanlevi1/rtlify.git
+cd rtlify/examples/playground
 npx rtlify check
 ```
 
-`BrokenDashboard.tsx` is packed with 11 intentional RTL violations. The linter catches all of them.
+`BrokenDashboard.tsx` has 11 intentional RTL violations. The linter catches all of them.
 
----
-
-RTLify is a step toward making AI-generated UI fully localization-aware — not just RTL-correct.
-
----
+<br/>
 
 ## Contributing
 
-### For Users
-
-Just run `npx rtlify init` in your project. RTLify auto-detects which editors you use and only writes to the relevant config files. No manual setup needed.
-
-### For Contributors
+We welcome contributions! Here's how to get started:
 
 ```bash
-# 1. Clone the repository
+# 1. Clone & build
 git clone https://github.com/idanlevi1/rtlify.git
 cd rtlify
-
-# 2. Install dependencies & build
 npm install
 npm run build
 
-# 3. Understand the structure
+# 2. Project structure
 src/
-├── cli.ts              # CLI entry point — commands, patterns, templates, detection
+├── cli.ts              # CLI entry — commands, patterns, templates, editor detection
 └── rules.md            # 8 RTL rules (Rule 6 is a dynamic placeholder)
 
 examples/playground/
 └── BrokenDashboard.tsx # Test file with intentional violations
 
-# 4. Test your changes locally
+# 3. Test your changes
 node dist/cli.js init          # Test init in a temp folder
-node dist/cli.js check         # Test linter against playground
-node dist/cli.js help          # Test help output
+node dist/cli.js check         # Run linter against playground
+node dist/cli.js help          # Verify help output
 
-# 5. Key files to know
-# - ARCHITECTURE.md            Explains how everything connects
-# - .rtlifyrc.json             Generated config (i18n vs hardcoded mode)
-# - src/rules.md               Contains <!-- RTLIFY_I18N_RULE --> placeholder
-#                               (replaced at runtime — see ARCHITECTURE.md)
+# 4. Key files to know
+# ARCHITECTURE.md              How everything connects (start here!)
+# .rtlifyrc.json               Generated config (i18n vs hardcoded mode)
+# .rtlify-rules.md             Generated full ruleset (single source of truth)
 
-# 6. Create a PR (never push directly to main)
+# 5. Submit a PR
 git checkout -b feat/your-feature
 git commit -m "feat: description"
 git push -u origin feat/your-feature
 gh pr create
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed design decisions, the data flow diagram, and gotchas for new contributors.
+Read [ARCHITECTURE.md](ARCHITECTURE.md) before diving in — it covers the data flow, key design decisions, and gotchas that will save you time.
 
-## License
+<br/>
 
-MIT
+---
+
+<div align="center">
+
+RTLify is a step toward making AI-generated UI fully localization-aware — not just RTL-correct.
+
+<br/>
+
+Built by **[Idan Levi](https://github.com/idanlevi1)** · If RTLify helped you, give it a ⭐
+
+<br/>
+
+**[MIT License](LICENSE)**
+
+</div>

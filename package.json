@@ -24,6 +24,15 @@
     "claude-code"
   ],
   "license": "MIT",
+  "author": "Idan Levi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/idanlevi1/rtlify.git"
+  },
+  "bugs": {
+    "url": "https://github.com/idanlevi1/rtlify/issues"
+  },
+  "homepage": "https://github.com/idanlevi1/rtlify#readme",
   "engines": {
     "node": ">=18.0.0"
   },
