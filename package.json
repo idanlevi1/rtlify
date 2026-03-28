@@ -1,0 +1,34 @@
+{
+  "name": "rtlify",
+  "version": "0.1.0",
+  "description": "Zero-config RTL & Localization rules for Claude Code",
+  "type": "module",
+  "bin": {
+    "rtlify": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && cp src/rules.md dist/rules.md",
+    "dev": "tsc --watch",
+    "start": "node dist/cli.js"
+  },
+  "keywords": [
+    "rtl",
+    "i18n",
+    "react",
+    "tailwind",
+    "hebrew",
+    "arabic",
+    "claude-code"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}
