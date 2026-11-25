@@ -10,6 +10,7 @@ Teach your AI editor once — it generates production-ready<br/>RTL code from th
 
 <br/>
 
+[![CI](https://github.com/idanlevi1/rtlify/actions/workflows/ci.yml/badge.svg)](https://github.com/idanlevi1/rtlify/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/rtlify-ai?style=flat-square&color=cb3837)](https://www.npmjs.com/package/rtlify-ai)
 [![license](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen?style=flat-square)](package.json)
@@ -76,18 +77,20 @@ Run once per project. After that, just code normally — your AI editor reads th
 <table>
 <tr>
 <td align="center"><strong>Claude Code</strong><br/><sub>CLAUDE.md + /rtlify</sub></td>
-<td align="center"><strong>Cursor</strong><br/><sub>.cursorrules</sub></td>
-<td align="center"><strong>Windsurf</strong><br/><sub>.windsurfrules</sub></td>
-<td align="center"><strong>Cline</strong><br/><sub>.clinerules</sub></td>
+<td align="center"><strong>Cursor</strong><br/><sub>.cursor/rules/rtlify.mdc</sub></td>
+<td align="center"><strong>Windsurf</strong><br/><sub>.windsurf/rules/rtlify.md</sub></td>
+<td align="center"><strong>Cline</strong><br/><sub>.clinerules (file or folder)</sub></td>
 <td align="center"><strong>Copilot</strong><br/><sub>copilot-instructions.md</sub></td>
 <td align="center"><strong>Gemini CLI</strong><br/><sub>GEMINI.md</sub></td>
 <td align="center"><strong>Codex CLI</strong><br/><sub>AGENTS.md</sub></td>
 </tr>
 </table>
 
+Editors are auto-detected. Legacy `.cursorrules` / `.windsurfrules` files are reused if your project already has them.
+
 ### Supported Frameworks
 
-**React & Next.js** · **Vite** · **React Native** · **Vanilla JS/TS** · **Tailwind CSS v3 & v4**
+**React & Next.js** · **Vite** · **React Native** · **Vue** · **Svelte** · **Astro** · **Vanilla JS/TS/CSS/SCSS** · **Tailwind CSS v3 & v4**
 
 <br/>
 
@@ -109,6 +112,12 @@ npx rtlify-ai init
 
 Installs the **RTL Brain**: 8 architecture rules with **"do this / not that"** code examples and a full Tailwind class mapping table. The AI reads them automatically — no extra prompting.
 
+| Option | What it does |
+|---|---|
+| `--i18n` / `--hardcoded` | Pick the translation mode without the prompt (also switches an existing project) |
+| `--editors claude,cursor` | Choose editors explicitly: `claude`, `cursor`, `windsurf`, `cline`, `copilot`, `gemini`, `codex`, `all` |
+| `--no-skill` | Don't install the global `/rtlify` Claude Code skill |
+
 ### Step 2 — 🔍 The Audit
 
 ```bash
@@ -124,7 +133,33 @@ npx rtlify-ai check
   1 violation across 1 file
 ```
 
-Exits with code 1 — plug it into CI.
+Scans `.js` `.jsx` `.ts` `.tsx` `.mjs` `.cjs` `.css` `.scss` `.sass` `.less` `.vue` `.svelte` `.astro` `.html` — physical CSS (`margin-left`, `left:`, `text-align: right`), inline and React Native styles (`marginLeft`, `paddingRight`), and physical Tailwind classes (`ml-4`, `md:pl-2`, `text-left`, `rounded-tl`, `border-l`…).
+
+```bash
+npx rtlify-ai check src/ app/     # only these paths
+npx rtlify-ai check --json        # machine-readable report
+```
+
+| Exit code | Meaning |
+|---|---|
+| `0` | No violations |
+| `1` | Violations found |
+| `2` | No scannable files (wrong folder?) |
+
+Plug it into CI:
+
+```yaml
+- run: npx rtlify-ai check
+```
+
+**Intentional physical layout?** (a chart axis, a phone-number input) Silence it:
+
+```tsx
+<div className="ml-4" /> {/* rtlify-ignore */}
+// rtlify-ignore-next-line
+const axis = { left: 0 };
+/* rtlify-ignore-file */   // in the first 5 lines
+```
 
 ### Step 3 — 🪄 The `/rtlify` Command
 
@@ -189,7 +224,7 @@ cd rtlify/examples/playground
 npx rtlify-ai check
 ```
 
-`BrokenDashboard.tsx` has 11 intentional RTL violations. The linter catches all of them.
+`BrokenDashboard.tsx` is packed with RTL mistakes. The linter flags the 8 lines with physical CSS and Tailwind; the bidi and icon issues are what the AI rules teach your editor to fix.
 
 <br/>
 
@@ -206,21 +241,24 @@ npm run build
 
 # 2. Project structure
 src/
-├── cli.ts              # CLI entry — commands, patterns, templates, editor detection
+├── cli.ts              # CLI entry — commands, templates, output
+├── scanner.ts          # Lint patterns, file walking, ignore comments
+├── targets.ts          # Editor detection and config file locations
 └── rules.md            # 8 RTL rules (Rule 6 is a dynamic placeholder)
+test/                   # node:test suites (no extra dependencies)
 
 examples/playground/
 └── BrokenDashboard.tsx # Test file with intentional violations
 
 # 3. Test your changes
+npm test                       # Build + run all tests
 node dist/cli.js init          # Test init in a temp folder
 node dist/cli.js check         # Run linter against playground
 node dist/cli.js help          # Verify help output
 
 # 4. Key files to know
 # ARCHITECTURE.md              How everything connects (start here!)
-# .rtlify-rules.md             Generated rules + config (single file)
-# .rtlify-rules.md             Generated full ruleset (single source of truth)
+# .rtlify-rules.md             Generated rules + config (single source of truth)
 
 # 5. Submit a PR
 git checkout -b feat/your-feature
