@@ -32,6 +32,47 @@ Teach your AI editor once — it generates production-ready<br/>RTL code from th
 
 <br/>
 
+## Before / After
+
+Same prompt — *"Build an order confirmation card in Hebrew"* — same AI editor:
+
+<table>
+<tr><th>❌ Without RTLify</th><th>✅ With RTLify</th></tr>
+<tr>
+<td>
+
+```tsx
+<div className="ml-4 pl-6 text-left">
+  <ArrowRight className="mr-2" />
+  <p>ההזמנה שלך #12345 אושרה</p>
+  <p>סה"כ: ₪249.90</p>
+</div>
+```
+
+Margins on the wrong side, arrow points backwards, `#12345` jumps to the start of the sentence.
+
+</td>
+<td>
+
+```tsx
+<div className="ms-4 ps-6 text-start">
+  <ArrowRight className="me-2 rtl:-scale-x-100" />
+  <p>ההזמנה שלך <bdi>#12345</bdi> אושרה</p>
+  <p>סה"כ: {new Intl.NumberFormat('he-IL',
+    { style: 'currency', currency: 'ILS' }).format(249.9)}</p>
+</div>
+```
+
+Logical spacing, flipped icon, bidi-safe order number, localized currency.
+
+</td>
+</tr>
+</table>
+
+One command, then every component your AI writes looks like the right column.
+
+<br/>
+
 ## The Core Idea
 
 **RTLify doesn't fix code after generation — it prevents incorrect code from being generated in the first place.** Teach your AI once instead of fixing every component manually.
@@ -69,6 +110,14 @@ npx rtlify-ai init
 ```
 
 Run once per project. After that, just code normally — your AI editor reads the rules automatically in the background.
+
+**Claude Code plugin** (no npm step — adds the `/rtlify:rtlify` command, which sets up the rules on first use):
+
+```
+/plugin install rtlify --marketplace idanlevi1/rtlify
+```
+
+<sub>Older Claude Code: <code>/plugin marketplace add idanlevi1/rtlify</code> then <code>/plugin install rtlify@rtlify</code></sub>
 
 <br/>
 
