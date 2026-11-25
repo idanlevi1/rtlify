@@ -53,6 +53,29 @@ test("flags physical Tailwind classes, including variants and keywords", () => {
   ]) assert.ok(flagged(src), src);
 });
 
+test("flags space-x-* / divide-x-* without rtl:*-reverse", () => {
+  for (const src of [
+    '<div className="flex space-x-4" />',
+    '<div className="flex space-x-2 md:space-x-6" />',
+    '<div className="divide-x" />',
+    '<div className="divide-x-2" />',
+    '<div className="flex space-x-4 divide-x-2" />',
+    '<div className="flex space-x-4 rtl:divide-x-reverse" />',
+    '<div className="divide-x-2 rtl:space-x-reverse" />',
+  ]) assert.ok(flagged(src), src);
+});
+
+test("does not flag space-x-* / divide-x-* with rtl:*-reverse", () => {
+  for (const src of [
+    '<div className="flex space-x-4 rtl:space-x-reverse" />',
+    '<div className="rtl:space-x-reverse flex space-x-4" />',
+    '<div className="divide-x rtl:divide-x-reverse" />',
+    '<div className="divide-x-2 rtl:divide-x-reverse" />',
+    '<div className="divide-x-reverse" />',
+    '<div className="flex space-x-4 rtl:space-x-reverse divide-x-2 rtl:divide-x-reverse" />',
+  ]) assert.equal(flagged(src), false, src);
+});
+
 test("scans export lines", () => {
   assert.ok(flagged('export const Btn = () => <div className="ml-4 text-left">x</div>;'));
 });

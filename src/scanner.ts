@@ -46,6 +46,10 @@ export const PATTERNS: Pattern[] = [
   { regex: tw(String.raw`border-[lr](?:-|` + TW_END + ")"), category: "Tailwind Physical", message: "Use border-s-* / border-e-*" },
   { regex: tw(String.raw`-?scroll-[mp][lr]-`), category: "Tailwind Physical", message: "Use scroll-ms-* / scroll-me-* / scroll-ps-* / scroll-pe-*" },
 
+  // --- Tailwind space-x / divide-x (need rtl:*-reverse) ---
+  { regex: /^(?!.*\brtl:space-x-reverse\b).*?\bspace-x-(?:\d|\[|px|auto)/, category: "Tailwind Physical", message: "Add rtl:space-x-reverse (or use gap-* on flex containers) so space-x-* gaps flip in RTL" },
+  { regex: /^(?!.*\brtl:divide-x-reverse\b).*?\bdivide-x(?!-reverse\b)(?:-(?:\d|\[|px|auto))?/, category: "Tailwind Physical", message: "Add rtl:divide-x-reverse so divide-x borders flip in RTL" },
+
   // --- Hardcoded RTL text (i18n mode only) ---
   { regex: /[>}]\s{0,20}[^<{]{0,500}[֐-׿]{2,}/, category: "Hardcoded Hebrew", message: "Hardcoded Hebrew text — extract to i18n translation function", i18nOnly: true },
   { regex: /[>}]\s{0,20}[^<{]{0,500}[؀-ۿ]{2,}/, category: "Hardcoded Arabic", message: "Hardcoded Arabic/Persian text — extract to i18n translation function", i18nOnly: true },
