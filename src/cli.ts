@@ -234,7 +234,7 @@ async function init(args: string[]) {
   }
 
   // Write the full rules file (single source of truth, includes config)
-  const rulesTemplate = await readFile(RULES_PATH, "utf-8");
+  const rulesTemplate = (await readFile(RULES_PATH, "utf-8")).replace(/\r\n/g, "\n");
   const rule6 = config.enforceI18n ? RULE_6_I18N : RULE_6_HARDCODED;
   const rulesContent = `<!-- rtlify:enforceI18n=${config.enforceI18n} -->\n` + rulesTemplate.replace(I18N_PLACEHOLDER, rule6);
   const rulesWritten = existingRules?.replace(/\r\n/g, "\n") !== rulesContent;
