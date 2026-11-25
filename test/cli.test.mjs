@@ -144,3 +144,11 @@ test("init never overwrites a customised /rtlify skill", async () => {
     assert.equal(await readFile(join(dir, ".claude", "skills", "rtlify", "SKILL.md"), "utf-8"), "my custom skill");
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test("Claude Code plugin version matches package.json", async () => {
+  const root = join(dirname(CLI), "..");
+  const plugin = JSON.parse(await readFile(join(root, "plugin", ".claude-plugin", "plugin.json"), "utf-8"));
+  const market = JSON.parse(await readFile(join(root, ".claude-plugin", "marketplace.json"), "utf-8"));
+  assert.equal(plugin.version, PKG.version, "bump plugin/.claude-plugin/plugin.json version with each release");
+  assert.equal(market.plugins[0].name, plugin.name);
+});

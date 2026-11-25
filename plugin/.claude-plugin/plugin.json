@@ -1,0 +1,24 @@
+{
+  "name": "rtlify",
+  "version": "0.4.0",
+  "description": "Scan and fix RTL violations: logical CSS, Tailwind, React Native styles, icon flipping and bidi text",
+  "author": {
+    "name": "Idan Levi",
+    "url": "https://github.com/idanlevi1"
+  },
+  "homepage": "https://github.com/idanlevi1/rtlify",
+  "repository": "https://github.com/idanlevi1/rtlify",
+  "license": "MIT",
+  "keywords": [
+    "rtl",
+    "i18n",
+    "hebrew",
+    "arabic",
+    "persian",
+    "tailwind",
+    "react",
+    "react-native",
+    "css",
+    "bidi"
+  ]
+}

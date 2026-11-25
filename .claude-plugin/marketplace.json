@@ -1,0 +1,14 @@
+{
+  "name": "rtlify",
+  "description": "RTL (Hebrew, Arabic, Persian) rules and linter for AI-generated frontend code",
+  "owner": { "name": "Idan Levi", "url": "https://github.com/idanlevi1" },
+  "plugins": [
+    {
+      "name": "rtlify",
+      "source": "./plugin",
+      "description": "Scan and fix RTL violations: logical CSS, Tailwind, React Native styles, icon flipping and bidi text",
+      "category": "development",
+      "tags": ["rtl", "i18n", "hebrew", "arabic", "persian", "tailwind", "react", "react-native", "css"]
+    }
+  ]
+}

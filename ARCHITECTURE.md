@@ -47,6 +47,8 @@ rtlify/
 │   ├── scanner.ts        # Lint patterns, file walker, ignore comments
 │   ├── targets.ts        # Editor detection + where each pointer is written
 │   └── rules.md          # 8 RTL rules with <!-- RTLIFY_I18N_RULE --> placeholder
+├── .claude-plugin/marketplace.json  # Claude Code marketplace (repo root = marketplace root)
+├── plugin/               # Claude Code plugin: /rtlify:rtlify skill (version must match package.json)
 ├── test/                 # node:test suites (scanner + CLI end-to-end)
 ├── .github/workflows/    # CI: Linux / macOS / Windows × Node 18, 20, 22
 ├── dist/                  # Compiled JS + rules.md copy
