@@ -1,18 +1,24 @@
 {
   "name": "rtlify-ai",
-  "version": "0.3.1",
-  "description": "Zero-config RTL & Localization rules for Claude Code",
+  "version": "0.4.0",
+  "description": "Zero-config RTL rules and linter for AI code editors (Claude Code, Cursor, Windsurf, Cline, Copilot, Gemini, Codex) — Hebrew, Arabic, Persian",
   "type": "module",
   "bin": {
     "rtlify-ai": "dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsc && cp src/rules.md dist/rules.md",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc && node -e \"require('fs').copyFileSync('src/rules.md','dist/rules.md')\"",
     "dev": "tsc --watch",
-    "start": "node dist/cli.js"
+    "start": "node dist/cli.js",
+    "test": "npm run build && node --test test/scanner.test.mjs test/cli.test.mjs",
+    "prepublishOnly": "npm test"
   },
   "keywords": [
     "rtl",
@@ -40,7 +46,12 @@
     "ai-rules",
     "ai-coding",
     "linter",
-    "frontend"
+    "frontend",
+    "gemini",
+    "codex",
+    "vue",
+    "svelte",
+    "css"
   ],
   "license": "MIT",
   "author": "Idan Levi",
@@ -58,5 +69,8 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.8.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

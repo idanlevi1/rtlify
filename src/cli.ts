@@ -1,65 +1,80 @@
 #!/usr/bin/env node
 
-import { readFile, writeFile, readdir, mkdir, realpath } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { homedir } from "node:os";
 import { createInterface } from "node:readline";
-import { dirname, join, resolve, extname } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PATTERNS, collectFiles, scanContent, type Violation } from "./scanner.js";
+import { MARKER, TARGETS, detectTargets, type Target } from "./targets.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RULES_PATH = join(__dirname, "rules.md");
 const RULES_FILE = ".rtlify-rules.md";
-const CONFIG_COMMENT_RE = /^<!-- rtlify:enforceI18n=(true|false) -->\n/;
-const MARKER = "# RTLify Rules";
+const CONFIG_COMMENT_RE = /^<!-- rtlify:enforceI18n=(true|false) -->\r?\n/;
 const I18N_PLACEHOLDER = "<!-- RTLIFY_I18N_RULE -->";
+
+function readVersion(): string {
+  try {
+    return JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8")).version;
+  } catch {
+    return "unknown";
+  }
+}
+const VERSION = readVersion();
 
 interface RtlifyConfig {
   enforceI18n: boolean;
 }
 
-interface Target {
-  file: string;
-  dir?: string;
-  label: string;
-  detect: string[]; // files/dirs whose existence signals this editor is in use
+// --- ANSI (disabled for NO_COLOR, non-TTY output, unless FORCE_COLOR) ---
+const useColor = !process.env.NO_COLOR && (!!process.env.FORCE_COLOR || !!process.stdout.isTTY);
+const ansi = (code: string) => (useColor ? code : "");
+const RED = ansi("\x1b[31m");
+const GREEN = ansi("\x1b[32m");
+const YELLOW = ansi("\x1b[33m");
+const CYAN = ansi("\x1b[36m");
+const DIM = ansi("\x1b[2m");
+const BOLD = ansi("\x1b[1m");
+const RESET = ansi("\x1b[0m");
+
+// --- Args ---
+function flag(args: string[], name: string): boolean {
+  return args.includes(`--${name}`);
 }
 
-const TARGET_FILES: Target[] = [
-  { file: "CLAUDE.md", label: "Claude Code", detect: [".claude", "CLAUDE.md"] },
-  { file: ".cursorrules", label: "Cursor", detect: [".cursorrules", ".cursor"] },
-  { file: ".windsurfrules", label: "Windsurf", detect: [".windsurfrules"] },
-  { file: ".clinerules", label: "Cline", detect: [".clinerules"] },
-  { file: "copilot-instructions.md", dir: ".github", label: "Copilot", detect: [".github/copilot-instructions.md"] },
-  { file: "GEMINI.md", label: "Gemini CLI", detect: ["GEMINI.md"] },
-  { file: "AGENTS.md", label: "Codex CLI", detect: ["AGENTS.md"] },
-];
+function flagValue(args: string[], name: string): string | undefined {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith(`--${name}=`)) return args[i].slice(name.length + 3);
+    if (args[i] === `--${name}` && args[i + 1] && !args[i + 1].startsWith("-")) return args[i + 1];
+  }
+  return undefined;
+}
 
-const SKIP_DIRS = new Set([
-  "node_modules", ".git", "dist", "build", ".next", ".nuxt", "coverage",
-]);
-
-const SCAN_EXTENSIONS = new Set([".js", ".jsx", ".ts", ".tsx"]);
-
-// --- ANSI ---
-const RED = "\x1b[31m";
-const GREEN = "\x1b[32m";
-const YELLOW = "\x1b[33m";
-const CYAN = "\x1b[36m";
-const DIM = "\x1b[2m";
-const BOLD = "\x1b[1m";
-const RESET = "\x1b[0m";
+function positionals(args: string[], valueFlags: string[] = []): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a.startsWith("-")) {
+      if (valueFlags.includes(a.slice(2))) i++;
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+}
 
 // --- Config (stored as comment in .rtlify-rules.md) ---
-async function readConfig(): Promise<RtlifyConfig> {
-  try {
-    const content = await readFile(resolve(process.cwd(), RULES_FILE), "utf-8");
-    const match = content.match(CONFIG_COMMENT_RE);
-    if (match) return { enforceI18n: match[1] === "true" };
-  } catch {}
-  return { enforceI18n: false };
+async function readRules(): Promise<string | null> {
+  try { return await readFile(resolve(process.cwd(), RULES_FILE), "utf-8"); } catch { return null; }
 }
 
-async function rulesExist(): Promise<boolean> {
-  try { await readFile(resolve(process.cwd(), RULES_FILE), "utf-8"); return true; } catch { return false; }
+async function readConfig(): Promise<RtlifyConfig> {
+  const content = await readRules();
+  const match = content?.match(CONFIG_COMMENT_RE);
+  return { enforceI18n: match ? match[1] === "true" : false };
 }
 
 function ask(question: string): Promise<string> {
@@ -110,15 +125,25 @@ const RULE_6_HARDCODED = `### 6. Hardcoded Mode (No i18n)
 <p>ההזמנה שלך <bdi>#12345</bdi> אושרה בהצלחה</p>
 \`\`\``;
 
-// --- Dynamic skill ---
-// --- Pointer content per editor ---
-function buildPointer(): string {
-  return `# RTLify Rules
-When creating or modifying UI components, layouts, or RTL text (Hebrew/Arabic/Persian), you MUST read and strictly adhere to the guidelines in \`.rtlify-rules.md\`.
-`;
-}
+// --- Global /rtlify skill for Claude Code ---
+const SKILL_MANAGED = "<!-- Managed by rtlify-ai. Delete this line to keep your own edits. -->";
 
 const SKILL_CONTENT = `---
+name: rtlify
+description: Scan and fix RTL violations in the current project.
+---
+${SKILL_MANAGED}
+
+When the user types \`/rtlify\`:
+1. Run \`npx rtlify-ai check\` to find RTL violations
+2. Fix every violation according to \`.rtlify-rules.md\` — CSS to logical, icons flipped, \`<bdi>\` tags added
+3. Re-run \`npx rtlify-ai check\` to confirm zero violations
+Never extract strings to \`t()\` unless the rules file explicitly says to. Never break the build.
+If a flagged line is intentionally physical (e.g. a chart axis), add an \`// rtlify-ignore\` comment instead of changing it.
+`;
+
+// Skill written by rtlify-ai <= 0.3.x (no managed marker) — safe to upgrade.
+const LEGACY_SKILL_CONTENT = `---
 name: rtlify
 description: Scan and fix RTL violations in the current project.
 ---
@@ -130,282 +155,201 @@ When the user types \`/rtlify\`:
 Never extract strings to \`t()\` unless the rules file explicitly says to. Never break the build.
 `;
 
-async function installGlobalSkill(): Promise<boolean> {
-  const home = process.env.HOME || process.env.USERPROFILE || "";
-  if (!home) return false;
+type SkillResult = "installed" | "updated" | "unchanged" | "kept";
 
+async function installGlobalSkill(): Promise<SkillResult> {
+  const home = homedir();
+  if (!home) return "unchanged";
   const skillDir = join(home, ".claude", "skills", "rtlify");
   const skillPath = join(skillDir, "SKILL.md");
 
-  await mkdir(skillDir, { recursive: true });
-
-  let existing = "";
+  let existing: string | null = null;
   try { existing = await readFile(skillPath, "utf-8"); } catch {}
-  if (existing === SKILL_CONTENT) return false;
+  if (existing === SKILL_CONTENT) return "unchanged";
+  // Never overwrite a skill the user customised.
+  if (existing !== null && !existing.includes(SKILL_MANAGED) && existing.replace(/\r\n/g, "\n") !== LEGACY_SKILL_CONTENT) return "kept";
 
+  await mkdir(skillDir, { recursive: true });
   await writeFile(skillPath, SKILL_CONTENT, "utf-8");
-  return true;
+  return existing === null ? "installed" : "updated";
 }
-
-// --- Violation patterns ---
-interface Pattern {
-  regex: RegExp;
-  category: string;
-  message: string;
-  i18nOnly?: boolean;
-}
-
-const PATTERNS: Pattern[] = [
-  { regex: /margin-left|margin-right|padding-left|padding-right|border-left|border-right/, category: "Physical CSS", message: "Use logical properties (margin-inline-start, padding-inline-end, border-inline-start)" },
-  { regex: /\bleft\s*:/, category: "Physical CSS", message: "Use inset-inline-start instead of left" },
-  { regex: /\bright\s*:/, category: "Physical CSS", message: "Use inset-inline-end instead of right" },
-  { regex: /(?:^|[\s"'`{])(?:ml-|mr-|pl-|pr-|-ml-|-mr-|-pl-|-pr-)[\d[]/, category: "Tailwind Physical", message: "Use logical classes (ms-*, me-*, ps-*, pe-*)" },
-  { regex: /(?:^|[\s"'`{])(?:left-|right-|-left-|-right-)[\d[]/, category: "Tailwind Physical", message: "Use logical classes (start-*, end-*)" },
-  { regex: /(?:^|[\s"'`{])(?:text-left|text-right)(?=[\s"'`}]|$)/, category: "Tailwind Physical", message: "Use text-start / text-end" },
-  { regex: /(?:^|[\s"'`{])(?:float-left|float-right)(?=[\s"'`}]|$)/, category: "Tailwind Physical", message: "Use float-start / float-end" },
-  { regex: /(?:^|[\s"'`{])(?:rounded-l-|rounded-r-|rounded-tl-|rounded-tr-|rounded-bl-|rounded-br-)/, category: "Tailwind Physical", message: "Use logical rounding (rounded-s-*, rounded-e-*, rounded-ss-*, rounded-se-*, etc.)" },
-  { regex: /(?:^|[\s"'`{])(?:border-l-|border-r-)[\d[]/, category: "Tailwind Physical", message: "Use border-s-* / border-e-*" },
-  { regex: /(?:^|[\s"'`{])(?:scroll-ml-|scroll-mr-|scroll-pl-|scroll-pr-)/, category: "Tailwind Physical", message: "Use scroll-ms-* / scroll-me-* / scroll-ps-* / scroll-pe-*" },
-  { regex: /[>}]\s{0,20}[^<{]{0,500}[\u0590-\u05FF]{2,}/, category: "Hardcoded Hebrew", message: "Hardcoded Hebrew text — extract to i18n translation function", i18nOnly: true },
-  { regex: /[>}]\s{0,20}[^<{]{0,500}[\u0600-\u06FF]{2,}/, category: "Hardcoded Arabic", message: "Hardcoded Arabic text — extract to i18n translation function", i18nOnly: true },
-];
-
 
 // --- init ---
-async function init() {
-  let config: RtlifyConfig;
-  const hasConfig = await rulesExist();
+async function resolveMode(args: string[], hasRules: boolean): Promise<RtlifyConfig> {
+  if (flag(args, "i18n")) return { enforceI18n: true };
+  if (flag(args, "hardcoded")) return { enforceI18n: false };
+  if (hasRules) return readConfig();
+  if (!process.stdin.isTTY) return { enforceI18n: false };
 
-  if (hasConfig) {
-    config = await readConfig();
-    const mode = config.enforceI18n ? "i18n" : "hardcoded";
-    console.log("");
-    console.log(`  ${DIM}Config found ${RESET}${DIM}.rtlifyrc.json${RESET} ${DIM}(${mode} mode)${RESET}`);
-  } else if (process.stdin.isTTY) {
-    console.log("");
-    console.log(`  ${BOLD}rtlify-ai${RESET} ${DIM}v0.2.0${RESET}`);
-    console.log("");
-    console.log(`  ${BOLD}How do you handle translations?${RESET}`);
-    console.log("");
-    console.log(`    ${BOLD}1${RESET}  ${CYAN}Hardcoded${RESET}  — text written inline, no i18n library`);
-    console.log(`    ${BOLD}2${RESET}  ${GREEN}i18n${RESET}       — uses react-i18next, next-intl, vue-i18n, etc.`);
-    console.log("");
-    const answer = await ask(`  ${BOLD}>${RESET} Mode ${DIM}[1/2, default: 1]${RESET} `);
-    config = { enforceI18n: answer === "2" };
-  } else {
-    config = { enforceI18n: false };
+  console.log("");
+  console.log(`  ${BOLD}rtlify-ai${RESET} ${DIM}v${VERSION}${RESET}`);
+  console.log("");
+  console.log(`  ${BOLD}How do you handle translations?${RESET}`);
+  console.log("");
+  console.log(`    ${BOLD}1${RESET}  ${CYAN}Hardcoded${RESET}  — text written inline, no i18n library`);
+  console.log(`    ${BOLD}2${RESET}  ${GREEN}i18n${RESET}       — uses react-i18next, next-intl, vue-i18n, etc.`);
+  console.log("");
+  const answer = await ask(`  ${BOLD}>${RESET} Mode ${DIM}[1/2, default: 1]${RESET} `);
+  return { enforceI18n: answer === "2" };
+}
+
+async function resolveTargets(args: string[], cwd: string): Promise<Target[]> {
+  const editors = flagValue(args, "editors");
+  if (editors) {
+    const ids = editors.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    if (ids.includes("all")) return TARGETS;
+    const unknown = ids.filter((id) => !TARGETS.some((t) => t.id === id));
+    if (unknown.length) throw new Error(`Unknown editor(s): ${unknown.join(", ")}. Valid: ${TARGETS.map((t) => t.id).join(", ")}, all`);
+    return TARGETS.filter((t) => ids.includes(t.id));
   }
 
-  const rulesTemplate = await readFile(RULES_PATH, "utf-8");
-  const rule6 = config.enforceI18n ? RULE_6_I18N : RULE_6_HARDCODED;
-  const configComment = `<!-- rtlify:enforceI18n=${config.enforceI18n} -->\n`;
-  const rulesContent = configComment + rulesTemplate.replace(I18N_PLACEHOLDER, rule6);
+  const detected = await detectTargets(cwd);
+  if (detected.length > 0) return detected;
+  if (!process.stdin.isTTY) return TARGETS;
 
+  console.log("");
+  console.log(`  ${BOLD}Which AI editors do you use?${RESET} ${DIM}(comma-separated numbers, or Enter for all)${RESET}`);
+  console.log("");
+  TARGETS.forEach((t, i) => console.log(`    ${BOLD}${i + 1}${RESET}  ${t.label}`));
+  console.log("");
+  const picks = await ask(`  ${BOLD}>${RESET} Editors ${DIM}[1-${TARGETS.length}, default: all]${RESET} `);
+  if (picks === "") return TARGETS;
+  const chosen = picks
+    .split(",")
+    .map((s) => parseInt(s.trim(), 10) - 1)
+    .filter((i) => i >= 0 && i < TARGETS.length)
+    .map((i) => TARGETS[i]);
+  return chosen.length > 0 ? chosen : TARGETS;
+}
+
+async function init(args: string[]) {
   const cwd = process.cwd();
-  async function fileExists(p: string): Promise<boolean> {
-    try { await readFile(p, "utf-8"); return true; } catch { return false; }
-  }
-  async function dirExists(p: string): Promise<boolean> {
-    try { const entries = await readdir(p); return entries !== undefined; } catch { return false; }
+  const existingRules = await readRules();
+  const config = await resolveMode(args, existingRules !== null);
+  const mode = config.enforceI18n ? "i18n" : "hardcoded";
+
+  if (existingRules !== null && !flag(args, "i18n") && !flag(args, "hardcoded")) {
+    console.log("");
+    console.log(`  ${DIM}Config found in ${RULES_FILE} (${mode} mode) — use --i18n or --hardcoded to switch${RESET}`);
   }
 
   // Write the full rules file (single source of truth, includes config)
-  const rulesPath = resolve(cwd, RULES_FILE);
-  let rulesWritten = false;
-  let existingRulesContent = "";
-  try { existingRulesContent = await readFile(rulesPath, "utf-8"); } catch {}
-  if (existingRulesContent !== rulesContent) {
-    await writeFile(rulesPath, rulesContent, "utf-8");
-    rulesWritten = true;
-  }
+  const rulesTemplate = (await readFile(RULES_PATH, "utf-8")).replace(/\r\n/g, "\n");
+  const rule6 = config.enforceI18n ? RULE_6_I18N : RULE_6_HARDCODED;
+  const rulesContent = `<!-- rtlify:enforceI18n=${config.enforceI18n} -->\n` + rulesTemplate.replace(I18N_PLACEHOLDER, rule6);
+  const rulesWritten = existingRules?.replace(/\r\n/g, "\n") !== rulesContent;
+  if (rulesWritten) await writeFile(resolve(cwd, RULES_FILE), rulesContent, "utf-8");
 
-  // Detect which editors are in use
-  const detected: Target[] = [];
-  for (const target of TARGET_FILES) {
-    for (const signal of target.detect) {
-      const signalPath = resolve(cwd, signal);
-      if (await fileExists(signalPath) || await dirExists(signalPath)) {
-        detected.push(target);
-        break;
-      }
-    }
-  }
-
-  // If no editors detected, ask the user to pick (or default to all in non-TTY)
-  let targets: Target[];
-  if (detected.length > 0) {
-    targets = detected;
-  } else if (process.stdin.isTTY) {
-    console.log("");
-    console.log(`  ${BOLD}Which AI editors do you use?${RESET} ${DIM}(comma-separated numbers, or Enter for all)${RESET}`);
-    console.log("");
-    for (let i = 0; i < TARGET_FILES.length; i++) {
-      console.log(`    ${BOLD}${i + 1}${RESET}  ${TARGET_FILES[i].label}`);
-    }
-    console.log("");
-    const picks = await ask(`  ${BOLD}>${RESET} Editors ${DIM}[1-${TARGET_FILES.length}, default: all]${RESET} `);
-
-    if (picks === "") {
-      targets = TARGET_FILES;
-    } else {
-      const indices = picks.split(",").map((s) => parseInt(s.trim(), 10) - 1);
-      targets = indices
-        .filter((i) => i >= 0 && i < TARGET_FILES.length)
-        .map((i) => TARGET_FILES[i]);
-      if (targets.length === 0) targets = TARGET_FILES;
-    }
-  } else {
-    targets = TARGET_FILES;
-  }
-
-  // Inject pointer into each editor config
+  // Point each editor at the rules file
+  const targets = await resolveTargets(args, cwd);
   const updated: string[] = [];
-  let skillInstalled = false;
-  for (const { file, dir, label } of targets) {
-    const targetDir = dir ? resolve(cwd, dir) : cwd;
-    const targetPath = join(targetDir, file);
-    if (dir) await mkdir(targetDir, { recursive: true });
-
+  let skill: SkillResult = "unchanged";
+  for (const target of targets) {
+    const out = await target.resolve(cwd);
     let existing = "";
     try {
-      existing = await readFile(targetPath, "utf-8");
+      if ((await stat(out.path)).isDirectory()) {
+        console.log(`  ${YELLOW}!${RESET} Skipped ${target.label}: ${relative(cwd, out.path)} is a directory`);
+        continue;
+      }
+      existing = await readFile(out.path, "utf-8");
     } catch (e: unknown) {
-      if (!(e instanceof Error && "code" in e && (e as NodeJS.ErrnoException).code === "ENOENT")) throw e;
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
     }
-    if (existing.includes(MARKER)) continue;
 
-    const separator = existing.length > 0 ? "\n\n" : "";
-    await writeFile(targetPath, existing + separator + buildPointer(), "utf-8");
-    updated.push(label);
-
-    // Install global /rtlify skill for Claude Code users
-    if (file === "CLAUDE.md" && !skillInstalled) {
-      skillInstalled = await installGlobalSkill();
+    if (!existing.includes(MARKER)) {
+      await mkdir(dirname(out.path), { recursive: true });
+      const separator = existing.length === 0 ? "" : existing.endsWith("\n") ? "\n" : "\n\n";
+      await writeFile(out.path, existing + separator + out.content, "utf-8");
+      updated.push(`${target.label} ${DIM}(${relative(cwd, out.path).replace(/\\/g, "/")})${RESET}`);
     }
+
+    if (target.id === "claude" && !flag(args, "no-skill")) skill = await installGlobalSkill();
   }
 
-  if (updated.length === 0 && !rulesWritten && !skillInstalled) {
+  if (updated.length === 0 && !rulesWritten && (skill === "unchanged" || skill === "kept")) {
     console.log("");
     console.log(`  ${GREEN}●${RESET} Already set up — nothing to update.`);
     console.log("");
     return;
   }
 
-  const mode = config.enforceI18n ? "i18n" : "hardcoded";
-
   console.log("");
   console.log(`  ${GREEN}${BOLD}RTLify initialized${RESET}`);
   console.log("");
-
-  if (rulesWritten) {
-    console.log(`  ${GREEN}+${RESET} .rtlify-rules.md ${DIM}(rules + config)${RESET}`);
-  }
-  if (updated.length > 0) {
-    for (const label of updated) {
-      console.log(`  ${GREEN}+${RESET} ${label}`);
-    }
-  }
-  if (skillInstalled) {
-    console.log(`  ${GREEN}+${RESET} /rtlify ${DIM}(global slash command)${RESET}`);
-  }
-
+  if (rulesWritten) console.log(`  ${GREEN}+${RESET} ${RULES_FILE} ${DIM}(rules + config)${RESET}`);
+  for (const label of updated) console.log(`  ${GREEN}+${RESET} ${label}`);
+  if (skill === "installed" || skill === "updated") console.log(`  ${GREEN}+${RESET} /rtlify ${DIM}(global Claude Code skill ${skill})${RESET}`);
+  if (skill === "kept") console.log(`  ${DIM}  /rtlify skill has local edits — left untouched${RESET}`);
   console.log("");
-  console.log(`  ${DIM}Mode${RESET}  ${mode === "i18n" ? `${GREEN}i18n${RESET}` : `${CYAN}hardcoded${RESET}`}`);
+  console.log(`  ${DIM}Mode${RESET}  ${config.enforceI18n ? `${GREEN}i18n${RESET}` : `${CYAN}hardcoded${RESET}`}`);
   console.log("");
   console.log(`  ${DIM}Next: ${RESET}${BOLD}npx rtlify-ai check${RESET}${DIM} to scan for violations${RESET}`);
   console.log("");
 }
 
 // --- check ---
-interface Violation { line: number; content: string; category: string; message: string; }
-
-const MAX_LINE_LENGTH = 2000;
-
 function sanitizeForTerminal(s: string): string {
   return s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "");
 }
 
-async function collectFiles(dir: string, root?: string): Promise<string[]> {
-  const projectRoot = root ?? dir;
-  const files: string[] = [];
-  const entries = await readdir(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (SKIP_DIRS.has(entry.name)) continue;
-    const fullPath = join(dir, entry.name);
+const EXIT_VIOLATIONS = 1;
+const EXIT_NO_FILES = 2;
 
-    // Resolve symlinks and verify they stay within the project root
-    let real: string;
-    try { real = await realpath(fullPath); } catch { continue; }
-    if (!real.startsWith(projectRoot + "/") && real !== projectRoot) continue;
-
-    if (entry.isDirectory()) files.push(...(await collectFiles(fullPath, projectRoot)));
-    else if (SCAN_EXTENSIONS.has(extname(entry.name))) files.push(fullPath);
-  }
-  return files;
-}
-
-function scanContent(content: string, patterns: Pattern[]): Violation[] {
-  const violations: Violation[] = [];
-  const lines = content.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.length > MAX_LINE_LENGTH) continue;
-    if (/^\s*(\/\/|\/\*|\*|export\s|import\s|require\()/.test(line)) continue;
-    const cleaned = line.replace(/\/\/.*$/, "").replace(/\/\*.*?\*\//g, "");
-    for (const pattern of patterns) {
-      if (pattern.regex.test(cleaned)) {
-        violations.push({ line: i + 1, content: line.trim(), category: pattern.category, message: pattern.message });
-        break;
-      }
-    }
-  }
-  return violations;
-}
-
-async function check() {
+async function check(args: string[]) {
   const cwd = process.cwd();
+  const json = flag(args, "json");
   const config = await readConfig();
   const activePatterns = config.enforceI18n ? PATTERNS : PATTERNS.filter((p) => !p.i18nOnly);
   const mode = config.enforceI18n ? "i18n" : "hardcoded";
+  const paths = positionals(args);
 
-  console.log("");
-  console.log(`  ${BOLD}rtlify-ai check${RESET} ${DIM}(${mode} mode)${RESET}`);
-  console.log("");
-
-  const files = await collectFiles(cwd);
-  if (files.length === 0) {
-    console.log(`  ${DIM}No .js/.jsx/.ts/.tsx files found.${RESET}`);
-    console.log("");
-    return;
-  }
-
-  let totalViolations = 0;
-  let filesWithViolations = 0;
-
+  const files = await collectFiles(cwd, paths.length ? paths : ["."]);
+  const results: { file: string; violations: Violation[] }[] = [];
   for (const filePath of files) {
-    const content = await readFile(filePath, "utf-8");
-    const violations = scanContent(content, activePatterns);
-    if (violations.length === 0) continue;
-    filesWithViolations++;
-    totalViolations += violations.length;
-    const relative = filePath.replace(cwd + "/", "");
-    console.log(`  ${CYAN}${relative}${RESET}`);
-    for (const v of violations) {
-      console.log(`    ${DIM}${String(v.line).padStart(4)}${RESET} ${YELLOW}${v.category}${RESET}`);
-      console.log(`         ${DIM}${v.message}${RESET}`);
-      console.log(`         ${RED}${sanitizeForTerminal(v.content)}${RESET}`);
+    const violations = scanContent(await readFile(filePath, "utf-8"), activePatterns);
+    if (violations.length) results.push({ file: relative(cwd, filePath).replace(/\\/g, "/"), violations });
+  }
+  const total = results.reduce((n, r) => n + r.violations.length, 0);
+
+  if (json) {
+    const report = {
+      version: VERSION,
+      mode,
+      filesScanned: files.length,
+      violationCount: total,
+      violations: results.flatMap((r) => r.violations.map((v) => ({ file: r.file, ...v }))),
+    };
+    process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+  } else {
+    console.log("");
+    console.log(`  ${BOLD}rtlify-ai check${RESET} ${DIM}(${mode} mode, ${files.length} file${files.length === 1 ? "" : "s"})${RESET}`);
+    console.log("");
+    if (files.length === 0) {
+      console.log(`  ${YELLOW}No scannable files found${RESET} ${DIM}(js, ts, jsx, tsx, css, scss, vue, svelte, astro, html)${RESET}`);
+      console.log("");
     }
-    console.log();
+    for (const r of results) {
+      console.log(`  ${CYAN}${r.file}${RESET}`);
+      for (const v of r.violations) {
+        console.log(`    ${DIM}${String(v.line).padStart(4)}${RESET} ${YELLOW}${v.category}${RESET}`);
+        console.log(`         ${DIM}${v.message}${RESET}`);
+        console.log(`         ${RED}${sanitizeForTerminal(v.content)}${RESET}`);
+      }
+      console.log("");
+    }
+    if (files.length > 0 && total === 0) {
+      console.log(`  ${GREEN}${BOLD}No violations found${RESET} ${DIM}— RTL-ready!${RESET}`);
+      console.log("");
+    } else if (total > 0) {
+      console.log(`  ${RED}${BOLD}${total} violation${total === 1 ? "" : "s"}${RESET} ${DIM}across ${results.length} file${results.length === 1 ? "" : "s"}${RESET}`);
+      console.log(`  ${DIM}Intentional? Add ${RESET}// rtlify-ignore${DIM} to the line.${RESET}`);
+      console.log("");
+    }
   }
 
-  if (totalViolations === 0) {
-    console.log(`  ${GREEN}${BOLD}No violations found${RESET} ${DIM}— RTL-ready!${RESET}`);
-    console.log("");
-  } else {
-    console.log(`  ${RED}${BOLD}${totalViolations} violation${totalViolations === 1 ? "" : "s"}${RESET} ${DIM}across ${filesWithViolations} file${filesWithViolations === 1 ? "" : "s"}${RESET}`);
-    console.log("");
-    process.exit(1);
-  }
+  if (files.length === 0) process.exitCode = EXIT_NO_FILES;
+  else if (total > 0) process.exitCode = EXIT_VIOLATIONS;
 }
 
 // --- fix ---
@@ -413,7 +357,19 @@ const FIX_PROMPT = `Scan all files in this project for RTL violations by running
 Fix every violation according to the rules in \`.rtlify-rules.md\`.
 After fixing, re-run \`npx rtlify-ai check\` to confirm zero remaining violations.`;
 
-async function fix() {
+function copyToClipboard(text: string): boolean {
+  const candidates: [string, string[]][] =
+    process.platform === "darwin" ? [["pbcopy", []]]
+    : process.platform === "win32" ? [["clip", []]]
+    : [["wl-copy", []], ["xclip", ["-selection", "clipboard"]], ["xsel", ["--clipboard", "--input"]]];
+  for (const [cmd, cmdArgs] of candidates) {
+    const r = spawnSync(cmd, cmdArgs, { input: text, stdio: ["pipe", "ignore", "ignore"], timeout: 3000 });
+    if (!r.error && r.status === 0) return true;
+  }
+  return false;
+}
+
+function fix() {
   console.log("");
   console.log(`  ${BOLD}rtlify-ai fix${RESET}`);
   console.log("");
@@ -427,49 +383,50 @@ async function fix() {
   console.log("");
   console.log(`  ${DIM}Claude Code users: just type ${RESET}${BOLD}/rtlify${RESET}${DIM} instead.${RESET}`);
   console.log("");
-
-  // Try to copy to clipboard
-  try {
-    const { execSync } = await import("node:child_process");
-    if (process.platform === "darwin") {
-      execSync("pbcopy", { input: FIX_PROMPT });
-      console.log(`  ${GREEN}Copied to clipboard!${RESET}`);
-    } else if (process.platform === "linux") {
-      execSync("xclip -selection clipboard", { input: FIX_PROMPT });
-      console.log(`  ${GREEN}Copied to clipboard!${RESET}`);
-    }
-  } catch {
-    // Clipboard not available — that's fine
+  if (copyToClipboard(FIX_PROMPT)) {
+    console.log(`  ${GREEN}Copied to clipboard!${RESET}`);
+    console.log("");
   }
-  console.log("");
 }
 
 // --- help ---
 function printUsage() {
   console.log("");
-  console.log(`  ${BOLD}rtlify-ai${RESET} ${DIM}v0.1.0${RESET}`);
+  console.log(`  ${BOLD}rtlify-ai${RESET} ${DIM}v${VERSION}${RESET}`);
   console.log(`  ${DIM}RTL-aware AI rules for frontend developers${RESET}`);
   console.log("");
-  console.log(`  ${BOLD}Commands${RESET}`);
+  console.log(`  ${BOLD}Usage${RESET}`);
   console.log("");
-  console.log(`    ${BOLD}init${RESET}     Set up RTLify in this project`);
-  console.log(`             ${DIM}Auto-detects your editors, asks i18n preference${RESET}`);
-  console.log(`    ${BOLD}check${RESET}    Scan for RTL violations`);
-  console.log(`             ${DIM}Flags physical CSS, Tailwind classes, and bidi issues${RESET}`);
-  console.log(`    ${BOLD}fix${RESET}      Generate a fix prompt for any AI editor`);
-  console.log(`             ${DIM}Copies to clipboard — paste into Cursor, Windsurf, Cline, etc.${RESET}`);
-  console.log(`    ${BOLD}help${RESET}     Show this message`);
+  console.log(`    ${BOLD}init${RESET} ${DIM}[--i18n | --hardcoded] [--editors claude,cursor,...] [--no-skill]${RESET}`);
+  console.log(`             Set up RTLify in this project (auto-detects editors)`);
+  console.log(`    ${BOLD}check${RESET} ${DIM}[paths...] [--json]${RESET}`);
+  console.log(`             Scan for RTL violations — exit 1 on violations, 2 if no files`);
+  console.log(`    ${BOLD}fix${RESET}      Print (and copy) a fix prompt for any AI editor`);
+  console.log(`    ${BOLD}help${RESET}     Show this message   ${BOLD}--version${RESET}  Print version`);
   console.log("");
-  console.log(`  ${DIM}Docs${RESET}  ${CYAN}https://github.com/idanlevi1/rtlify${RESET}`);
+  console.log(`  ${DIM}Editors${RESET}  ${TARGETS.map((t) => t.id).join(", ")}, all`);
+  console.log(`  ${DIM}Ignore${RESET}   // rtlify-ignore · // rtlify-ignore-next-line · // rtlify-ignore-file`);
+  console.log(`  ${DIM}Docs${RESET}     ${CYAN}https://github.com/idanlevi1/rtlify${RESET}`);
   console.log("");
 }
 
 // --- main ---
-const command = process.argv[2];
-switch (command) {
-  case "init": init().catch((e) => { console.error("Error:", e.message); process.exit(1); }); break;
-  case "check": check().catch((e) => { console.error("Error:", e.message); process.exit(1); }); break;
-  case "fix": fix().catch((e) => { console.error("Error:", e.message); process.exit(1); }); break;
-  case "help": case "--help": case "-h": printUsage(); break;
-  default: printUsage(); process.exit(command ? 1 : 0);
+async function main() {
+  const [command, ...args] = process.argv.slice(2);
+  switch (command) {
+    case "init": return init(args);
+    case "check": return check(args);
+    case "fix": return fix();
+    case "--version": case "-v": case "version": console.log(VERSION); return;
+    case "help": case "--help": case "-h": case undefined: printUsage(); return;
+    default:
+      console.error(`Unknown command: ${command}`);
+      printUsage();
+      process.exitCode = 1;
+  }
 }
+
+main().catch((e: unknown) => {
+  console.error(`${RED}Error:${RESET} ${e instanceof Error ? e.message : String(e)}`);
+  process.exitCode = 1;
+});

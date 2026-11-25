@@ -16,26 +16,26 @@ npx rtlify-ai init
   │   Config stored as: <!-- rtlify:enforceI18n=false -->
   │
   ├─ Auto-detects which editors are in use (if none found, shows interactive picker)
-  ├─ Appends a short pointer to detected editor config files:
-  │   ├── CLAUDE.md        (Claude Code — includes /rtlify slash command)
-  │   ├── .cursorrules     (Cursor)
-  │   ├── .windsurfrules   (Windsurf)
-  │   ├── .clinerules      (Cline)
-  │   ├── .github/copilot-instructions.md  (Copilot)
-  │   ├── GEMINI.md        (Gemini CLI)
-  │   └── AGENTS.md        (Codex CLI)
+  │   (or uses --editors claude,cursor,... ; --i18n / --hardcoded force the mode)
+  ├─ Writes a short pointer for each editor (src/targets.ts):
+  │   ├── CLAUDE.md                          (Claude Code)
+  │   ├── .cursor/rules/rtlify.mdc           (Cursor — or appends to legacy .cursorrules)
+  │   ├── .windsurf/rules/rtlify.md          (Windsurf — or appends to legacy .windsurfrules)
+  │   ├── .clinerules or .clinerules/rtlify.md (Cline — file or folder)
+  │   ├── .github/copilot-instructions.md    (Copilot)
+  │   ├── GEMINI.md                          (Gemini CLI)
+  │   └── AGENTS.md                          (Codex CLI)
   │
-  │   CLAUDE.md gets an extended pointer (~10 lines) with /rtlify instructions.
-  │   All others get a 3-line pointer.
-  │
-  └─ If Claude Code detected: installs /rtlify skill globally (~/.claude/skills/rtlify/SKILL.md)
+  └─ If Claude Code selected: installs /rtlify skill globally (~/.claude/skills/rtlify/SKILL.md)
+      — only if missing or still managed by rtlify-ai (never overwrites user edits)
 
 npx rtlify-ai check
   │
   ├─ Reads config from .rtlify-rules.md header comment
-  ├─ Recursively scans .js/.jsx/.ts/.tsx files (skips node_modules, dist, etc.)
-  ├─ Runs 12 regex patterns against each line
-  └─ Outputs violations, exits with code 1 if any found
+  ├─ Recursively scans JS/TS, CSS/SCSS/Less, Vue, Svelte, Astro, HTML (skips node_modules, dist, etc.)
+  │   or only the paths given as arguments
+  ├─ Runs the regex patterns in src/scanner.ts against each line
+  └─ Prints violations (or JSON with --json); exit 0 clean, 1 violations, 2 no files
 ```
 
 ## File Structure
@@ -43,15 +43,19 @@ npx rtlify-ai check
 ```
 rtlify/
 ├── src/
-│   ├── cli.ts            # CLI entry point — all commands, patterns, templates
+│   ├── cli.ts            # CLI entry point — commands, templates, output
+│   ├── scanner.ts        # Lint patterns, file walker, ignore comments
+│   ├── targets.ts        # Editor detection + where each pointer is written
 │   └── rules.md          # 8 RTL rules with <!-- RTLIFY_I18N_RULE --> placeholder
+├── test/                 # node:test suites (scanner + CLI end-to-end)
+├── .github/workflows/    # CI: Linux / macOS / Windows × Node 18, 20, 22
 ├── dist/                  # Compiled JS + rules.md copy
 ├── examples/
 │   └── playground/
-│       └── BrokenDashboard.tsx   # 11 intentional violations for testing
+│       └── BrokenDashboard.tsx   # Intentional RTL mistakes for testing
 ├── assets/
 │   └── pillars.svg        # README infographic
-├── package.json           # v0.1.0, bin: "rtlify", zero runtime deps
+├── package.json           # bin: "rtlify-ai", zero runtime deps
 └── tsconfig.json
 ```
 
@@ -96,13 +100,14 @@ RTLify doesn't fix broken code after generation — it prevents incorrect code f
 
 ## Linter Patterns
 
-The `check` command runs 12 regex patterns:
+The `check` command's patterns live in `PATTERNS` (`src/scanner.ts`):
 
-- 3 physical CSS patterns (`margin-left`, `left:`, `right:`)
-- 7 physical Tailwind patterns (`ml-*`, `text-left`, `float-right`, `rounded-tl-*`, `border-l-*`, `scroll-ml-*`, positional `left-*`/`right-*`)
+- Physical CSS, kebab-case (`margin-left`, `border-top-left-radius`, `text-align: left`, `float: right`, `left:`/`right:`)
+- Physical styles, camelCase for inline styles and React Native (`marginLeft`, `paddingRight`, `borderTopLeftRadius`, `textAlign: 'left'`)
+- Physical Tailwind (`ml-*`, `ml-auto`, `left-*`, `text-left`, `float-right`, `clear-left`, `rounded-l`, `rounded-tl-*`, `border-l`, `scroll-ml-*`) including variants (`md:`) and `!important`
 - 2 hardcoded text patterns (Hebrew `[\u0590-\u05FF]`, Arabic `[\u0600-\u06FF]`) — only active when `enforceI18n: true`
 
-Lines over 2000 characters are skipped (ReDoS prevention). Comment lines and `import`/`export` statements are skipped. Inline comments are stripped before matching. Symlinks are resolved and verified to stay within the project root.
+Lines over 2000 characters are skipped (ReDoS prevention). Comment lines and `import`/`require`/`@import` lines are skipped. Inline comments are stripped before matching (URLs like `https://` are kept). `rtlify-ignore`, `rtlify-ignore-next-line` and `rtlify-ignore-file` comments silence findings. Symlinks are resolved and verified to stay within the project root using `path.relative` (works with Windows `\` paths). Every pattern has a test in `test/scanner.test.mjs` — add one when you add a pattern.
 
 ## Gotchas for Contributors
 
